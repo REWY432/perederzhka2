@@ -1,16 +1,19 @@
+
 import React, { useState, useEffect } from 'react';
-import { Booking, BookingStatus, DogSize, PRICES, AVAILABLE_TAGS, CHECKLIST_ITEMS } from '../types';
+import { Booking, BookingStatus, DogSize, PRICES, AVAILABLE_TAGS, CHECKLIST_ITEMS, ExpenseItem } from '../types';
 import { calculateDays } from '../services/mockBackend';
-import { X, AlertTriangle, Check, Syringe, ChevronLeft } from 'lucide-react';
+import { checkRangeAvailability } from '../services/tetrisService';
+import { X, AlertTriangle, Check, Syringe, ChevronLeft, Plus, Trash2, Hourglass, Info } from 'lucide-react';
 
 interface Props {
   initialData?: Booking;
   allBookings: Booking[]; // Passed for history lookup
+  maxCapacity: number;
   onClose: () => void;
   onSave: (data: Omit<Booking, 'id' | 'createdAt'>) => void;
 }
 
-const BookingForm: React.FC<Props> = ({ initialData, allBookings, onClose, onSave }) => {
+const BookingForm: React.FC<Props> = ({ initialData, allBookings, maxCapacity, onClose, onSave }) => {
   const [formData, setFormData] = useState<Omit<Booking, 'id' | 'createdAt'>>({
     dogName: '',
     breed: '',
@@ -18,8 +21,9 @@ const BookingForm: React.FC<Props> = ({ initialData, allBookings, onClose, onSav
     checkIn: new Date().toISOString().split('T')[0],
     checkOut: new Date().toISOString().split('T')[0],
     pricePerDay: PRICES[DogSize.SMALL],
-    diaperCost: 0,
-    damageCost: 0,
+    expenses: [],
+    diaperCost: 0, // Legacy support
+    damageCost: 0, // Legacy support
     comment: '',
     tags: [],
     checklist: [],
@@ -30,9 +34,16 @@ const BookingForm: React.FC<Props> = ({ initialData, allBookings, onClose, onSav
 
   const [days, setDays] = useState(1);
   const [totalEstimate, setTotalEstimate] = useState(0);
+  
+  // Expenses State
+  const [newExpenseTitle, setNewExpenseTitle] = useState('');
+  const [newExpenseAmount, setNewExpenseAmount] = useState('');
 
   // History State
   const [historyMatch, setHistoryMatch] = useState<{lastVisit: string, damage: number} | null>(null);
+
+  // Availability State
+  const [availability, setAvailability] = useState<{available: boolean, minRemaining: number}>({ available: true, minRemaining: maxCapacity });
 
   // Vaccine Warning
   const isVaccineExpired = formData.vaccineExpires && new Date(formData.vaccineExpires) < new Date(formData.checkOut);
@@ -63,10 +74,25 @@ const BookingForm: React.FC<Props> = ({ initialData, allBookings, onClose, onSav
           ...initialData,
           checkIn: toLocalYMD(initialData.checkIn),
           checkOut: toLocalYMD(initialData.checkOut),
-          vaccineExpires: toLocalYMD(initialData.vaccineExpires)
+          vaccineExpires: toLocalYMD(initialData.vaccineExpires),
+          expenses: initialData.expenses || []
       });
     }
-  }, []); // Empty dependency array ensures this only runs once on mount
+  }, []);
+
+  // Calculate Availability whenever dates change
+  useEffect(() => {
+     if (formData.checkIn && formData.checkOut) {
+         const result = checkRangeAvailability(
+             allBookings, 
+             formData.checkIn, 
+             formData.checkOut, 
+             maxCapacity, 
+             initialData?.id
+         );
+         setAvailability(result);
+     }
+  }, [formData.checkIn, formData.checkOut, allBookings, maxCapacity]);
 
   // Smart History Lookup
   const handleNameChange = (name: string) => {
@@ -93,8 +119,10 @@ const BookingForm: React.FC<Props> = ({ initialData, allBookings, onClose, onSav
                 vaccineExpires: toLocalYMD(match.vaccineExpires)
             }));
 
-            if (match.damageCost > 0) {
-                setHistoryMatch({ lastVisit: match.checkOut, damage: match.damageCost });
+            // Check for previous damages or high expenses
+            const pastDamage = (match.damageCost || 0);
+            if (pastDamage > 0) {
+                setHistoryMatch({ lastVisit: match.checkOut, damage: pastDamage });
             } else {
                 setHistoryMatch(null);
             }
@@ -132,12 +160,38 @@ const BookingForm: React.FC<Props> = ({ initialData, allBookings, onClose, onSav
      });
   };
 
+  // Add Expense Handler
+  const addExpense = () => {
+    if (newExpenseTitle && newExpenseAmount) {
+      const amount = Number(newExpenseAmount);
+      if (!isNaN(amount) && amount > 0) {
+        setFormData(prev => ({
+          ...prev,
+          expenses: [...(prev.expenses || []), { title: newExpenseTitle, amount }]
+        }));
+        setNewExpenseTitle('');
+        setNewExpenseAmount('');
+      }
+    }
+  };
+
+  const removeExpense = (index: number) => {
+     setFormData(prev => ({
+        ...prev,
+        expenses: (prev.expenses || []).filter((_, i) => i !== index)
+     }));
+  };
+
   useEffect(() => {
     const d = calculateDays(formData.checkIn, formData.checkOut);
     setDays(d > 0 ? d : 0);
-    const total = (d * formData.pricePerDay) + Number(formData.diaperCost) + Number(formData.damageCost);
+    
+    const expensesTotal = (formData.expenses || []).reduce((sum, item) => sum + item.amount, 0);
+    const legacyTotal = Number(formData.diaperCost || 0) + Number(formData.damageCost || 0);
+    
+    const total = (d * formData.pricePerDay) + expensesTotal + legacyTotal;
     setTotalEstimate(total > 0 ? total : 0);
-  }, [formData.checkIn, formData.checkOut, formData.pricePerDay, formData.diaperCost, formData.damageCost]);
+  }, [formData.checkIn, formData.checkOut, formData.pricePerDay, formData.expenses, formData.diaperCost, formData.damageCost]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,6 +231,31 @@ const BookingForm: React.FC<Props> = ({ initialData, allBookings, onClose, onSav
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           <form onSubmit={handleSubmit} className="p-4 md:p-8 space-y-6 pb-24 md:pb-8">
             
+            {/* Availability Alert */}
+            {!availability.available && formData.status !== BookingStatus.WAITLIST && (
+                <div className="bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 p-4 rounded-r-lg flex items-start gap-3 animate-pulse">
+                    <AlertTriangle className="text-red-600 dark:text-red-400 shrink-0" />
+                    <div>
+                        <h4 className="font-bold text-red-800 dark:text-red-200 text-sm">Нет свободных мест!</h4>
+                        <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                            На выбранные даты заняты все {maxCapacity} мест. Вы можете сохранить заявку в лист ожидания.
+                        </p>
+                    </div>
+                </div>
+            )}
+            
+            {availability.available && availability.minRemaining <= 1 && formData.status !== BookingStatus.WAITLIST && (
+                <div className="bg-amber-100 dark:bg-amber-900/30 border-l-4 border-amber-500 p-4 rounded-r-lg flex items-start gap-3">
+                    <Info className="text-amber-600 dark:text-amber-400 shrink-0" />
+                    <div>
+                        <h4 className="font-bold text-amber-800 dark:text-amber-200 text-sm">Осталось 1 место</h4>
+                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                            Вы занимаете последнее свободное место в эти даты.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Dog Info */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="relative">
@@ -272,35 +351,63 @@ const BookingForm: React.FC<Props> = ({ initialData, allBookings, onClose, onSav
             <div className="bg-gray-50 dark:bg-black/40 p-5 rounded-2xl border border-gray-100 dark:border-white/10 space-y-4 shadow-inner">
               <h3 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
                 <span className="w-1.5 h-5 bg-teal-500 rounded-full"></span>
-                Стоимость
+                Стоимость и Расходы
               </h3>
-              <div className="grid grid-cols-3 gap-3 md:gap-5">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 mb-1 block">Цена/день</label>
-                    <input
-                      type="number"
-                      className={inputClass}
-                      value={formData.pricePerDay}
-                      onChange={e => setFormData({...formData, pricePerDay: Number(e.target.value)})}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 mb-1 block">Памперсы</label>
-                    <input
-                      type="number"
-                      className={inputClass}
-                      value={formData.diaperCost}
-                      onChange={e => setFormData({...formData, diaperCost: Number(e.target.value)})}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 mb-1 block">Ущерб</label>
-                    <input
-                      type="number"
-                      className={inputClass}
-                      value={formData.damageCost}
-                      onChange={e => setFormData({...formData, damageCost: Number(e.target.value)})}
-                    />
+              
+              <div>
+                <label className="text-xs font-bold text-gray-500 mb-1 block">Цена за сутки</label>
+                <input
+                    type="number"
+                    className={inputClass}
+                    value={formData.pricePerDay}
+                    onChange={e => setFormData({...formData, pricePerDay: Number(e.target.value)})}
+                />
+              </div>
+
+              {/* Expense List */}
+              <div className="space-y-2 pt-2">
+                  <label className="text-xs font-bold text-gray-500 block">Дополнительные расходы</label>
+                  
+                  {/* List of added expenses */}
+                  {formData.expenses && formData.expenses.length > 0 && (
+                      <div className="space-y-2 mb-3">
+                          {formData.expenses.map((ex, idx) => (
+                              <div key={idx} className="flex justify-between items-center bg-white dark:bg-white/5 p-2 rounded-lg border border-gray-200 dark:border-white/10">
+                                  <span className="text-sm text-gray-700 dark:text-gray-200">{ex.title}</span>
+                                  <div className="flex items-center gap-3">
+                                      <span className="font-bold text-gray-900 dark:text-white">{ex.amount} ₽</span>
+                                      <button type="button" onClick={() => removeExpense(idx)} className="text-red-500 hover:bg-red-50 p-1 rounded">
+                                          <Trash2 size={14} />
+                                      </button>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+
+                  {/* Add New Expense */}
+                  <div className="flex gap-2 items-center">
+                      <input 
+                          type="text" 
+                          placeholder="Название (напр. Ветклиника)"
+                          className="flex-1 p-2 text-sm bg-white dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg outline-none"
+                          value={newExpenseTitle}
+                          onChange={e => setNewExpenseTitle(e.target.value)}
+                      />
+                      <input 
+                          type="number" 
+                          placeholder="Сумма"
+                          className="w-24 p-2 text-sm bg-white dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg outline-none"
+                          value={newExpenseAmount}
+                          onChange={e => setNewExpenseAmount(e.target.value)}
+                      />
+                      <button 
+                          type="button" 
+                          onClick={addExpense}
+                          className="p-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                      >
+                          <Plus size={18} />
+                      </button>
                   </div>
               </div>
 
@@ -310,6 +417,22 @@ const BookingForm: React.FC<Props> = ({ initialData, allBookings, onClose, onSav
                       <span>Проживание ({days} дн.):</span>
                       <span className="font-medium">{(days * formData.pricePerDay).toLocaleString()} ₽</span>
                   </div>
+                  {(formData.expenses?.length || 0) > 0 && (
+                      <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                          <span>Доп. расходы:</span>
+                          <span className="font-medium">
+                              {formData.expenses?.reduce((sum, i) => sum + i.amount, 0).toLocaleString()} ₽
+                          </span>
+                      </div>
+                  )}
+                  {/* Legacy Display */}
+                  {(formData.diaperCost > 0 || formData.damageCost > 0) && (
+                      <div className="flex justify-between text-sm text-gray-500 italic">
+                          <span>Старые записи (Архив):</span>
+                          <span>{(Number(formData.diaperCost) + Number(formData.damageCost)).toLocaleString()} ₽</span>
+                      </div>
+                  )}
+
                   <div className="flex justify-between items-center pt-2 text-teal-800 dark:text-teal-400 font-bold text-lg border-t border-dashed border-gray-300 dark:border-gray-700 mt-2">
                     <span>Итого:</span>
                     <span>{totalEstimate.toLocaleString()} ₽</span>
@@ -379,6 +502,7 @@ const BookingForm: React.FC<Props> = ({ initialData, allBookings, onClose, onSav
                     value={formData.status}
                     onChange={e => setFormData({...formData, status: e.target.value as BookingStatus})}
                   >
+                    <option value={BookingStatus.WAITLIST}>⏳ В листе ожидания</option>
                     <option value={BookingStatus.REQUEST}>Заявка</option>
                     <option value={BookingStatus.CONFIRMED}>Подтверждено</option>
                     <option value={BookingStatus.COMPLETED}>Завершено</option>

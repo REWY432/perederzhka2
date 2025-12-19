@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar as CalendarIcon, ClipboardList, BarChart3, Dog, Plus, Settings, Link as LinkIcon, AlertTriangle, Send, Sun, Moon, Columns, Menu } from 'lucide-react';
+import { LayoutDashboard, Calendar as CalendarIcon, ClipboardList, BarChart3, Dog, Plus, Settings, Link as LinkIcon, AlertTriangle, Send, Sun, Moon, Columns, Menu, Box } from 'lucide-react';
 import { Booking, BookingStatus } from './types';
-import { getBookings, saveBooking, deleteBooking, getApiUrl, setApiUrl } from './services/mockBackend';
+import { getBookings, saveBooking, deleteBooking, getApiUrl, setApiUrl, getMaxCapacity, setMaxCapacity } from './services/mockBackend';
 import { getTelegramSettings, saveTelegramSettings, sendTelegramMessage } from './services/telegramService';
+import PullToRefresh from './components/PullToRefresh';
 
 // Pages
 import Dashboard from './pages/Dashboard';
@@ -59,6 +61,8 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [apiUrl, setApiUrlState] = useState(getApiUrl());
   const [tempUrl, setTempUrl] = useState(getApiUrl());
+  const [maxCapacity, setMaxCapacityState] = useState(getMaxCapacity());
+  const [tempMaxCapacity, setTempMaxCapacity] = useState(getMaxCapacity());
   
   // Theme State
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
@@ -96,6 +100,9 @@ const App: React.FC = () => {
     setApiUrl(tempUrl);
     setApiUrlState(tempUrl);
     
+    setMaxCapacity(tempMaxCapacity);
+    setMaxCapacityState(tempMaxCapacity);
+
     saveTelegramSettings(tempTgToken, tempTgChatId);
     setTgSettings({ token: tempTgToken, chatId: tempTgChatId });
     
@@ -215,10 +222,14 @@ const App: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto relative w-full pt-20 pb-24 md:pt-0 md:pb-0">
+        <main 
+            id="main-scroll-container"
+            className="flex-1 overflow-auto relative w-full pt-20 pb-24 md:pt-0 md:pb-0"
+        >
           
           {isLoading && (
-            <div className="absolute inset-0 z-50 bg-black/20 backdrop-blur-sm flex items-center justify-center">
+            <div className="absolute inset-0 z-50 bg-black/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+               {/* Only show spinner if not pulling to refresh (PullToRefresh has its own spinner) */}
                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
             </div>
           )}
@@ -244,13 +255,15 @@ const App: React.FC = () => {
           )}
 
           <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-full">
-            <Routes>
-              <Route path="/" element={<Dashboard bookings={bookings} />} />
-              <Route path="/board" element={<KanbanBoard bookings={bookings} onStatusChange={handleStatusChange} />} />
-              <Route path="/calendar" element={<CalendarView bookings={bookings} />} />
-              <Route path="/bookings" element={<BookingsList bookings={bookings} onEdit={handleEdit} onDelete={handleDelete} onStatusChange={handleStatusChange} />} />
-              <Route path="/reports" element={<Reports bookings={bookings} />} />
-            </Routes>
+            <PullToRefresh onRefresh={refreshData} scrollContainerId="main-scroll-container">
+                <Routes>
+                <Route path="/" element={<Dashboard bookings={bookings} onStatusChange={handleStatusChange} maxCapacity={maxCapacity} />} />
+                <Route path="/board" element={<KanbanBoard bookings={bookings} onStatusChange={handleStatusChange} />} />
+                <Route path="/calendar" element={<CalendarView bookings={bookings} />} />
+                <Route path="/bookings" element={<BookingsList bookings={bookings} onEdit={handleEdit} onDelete={handleDelete} onStatusChange={handleStatusChange} />} />
+                <Route path="/reports" element={<Reports bookings={bookings} />} />
+                </Routes>
+            </PullToRefresh>
           </div>
         </main>
 
@@ -275,6 +288,7 @@ const App: React.FC = () => {
           <BookingForm 
             initialData={editingBooking}
             allBookings={bookings}
+            maxCapacity={maxCapacity}
             onClose={() => { setIsFormOpen(false); setEditingBooking(undefined); }}
             onSave={handleSaveBooking}
           />
@@ -290,6 +304,23 @@ const App: React.FC = () => {
                 </h2>
                 
                 <div className="space-y-6">
+                  {/* General Config */}
+                  <div className="bg-white/50 dark:bg-white/5 p-4 rounded-2xl border border-white/60 dark:border-white/10">
+                     <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-3 uppercase flex items-center gap-2">
+                        <Box size={16} /> Гостиница
+                     </h3>
+                     <div className="mb-2">
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Макс. вместимость (вольеры)</label>
+                        <input 
+                           type="number"
+                           min="1" 
+                           value={tempMaxCapacity}
+                           onChange={(e) => setTempMaxCapacity(Number(e.target.value))}
+                           className="w-full p-3 bg-white dark:bg-black/20 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-gray-700 dark:text-gray-200 text-sm"
+                        />
+                     </div>
+                  </div>
+
                   {/* Google Section */}
                   <div className="bg-white/50 dark:bg-white/5 p-4 rounded-2xl border border-white/60 dark:border-white/10">
                      <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-3 uppercase flex items-center gap-2">

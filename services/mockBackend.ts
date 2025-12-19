@@ -1,9 +1,18 @@
+
 import { Booking, BookingStatus, DogSize } from "../types";
 
 const STORAGE_KEY = 'dogstay_api_url';
+const CAPACITY_KEY = 'dogstay_max_capacity';
 
 export const getApiUrl = () => localStorage.getItem(STORAGE_KEY) || '';
 export const setApiUrl = (url: string) => localStorage.setItem(STORAGE_KEY, url);
+
+export const getMaxCapacity = (): number => {
+    const val = localStorage.getItem(CAPACITY_KEY);
+    return val ? parseInt(val, 10) : 10; // Default to 10 places
+};
+
+export const setMaxCapacity = (num: number) => localStorage.setItem(CAPACITY_KEY, num.toString());
 
 export const formatDate = (dateStr: string): string => {
   if (!dateStr) return '-';
@@ -28,7 +37,16 @@ export const calculateDays = (start: string, end: string): number => {
 
 export const calculateTotal = (booking: Booking): number => {
   const days = calculateDays(booking.checkIn, booking.checkOut);
-  return (days * booking.pricePerDay) + (booking.diaperCost || 0) + (booking.damageCost || 0);
+  
+  // Sum up new expenses list
+  const expensesTotal = booking.expenses 
+    ? booking.expenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) 
+    : 0;
+
+  // Include legacy fields if they exist
+  const legacyTotal = (booking.diaperCost || 0) + (booking.damageCost || 0);
+
+  return (days * booking.pricePerDay) + expensesTotal + legacyTotal;
 };
 
 // --- Async API Methods ---
@@ -43,13 +61,15 @@ export const getBookings = async (): Promise<Booking[]> => {
   try {
     const response = await fetch(url);
     const data = await response.json();
-    // Ensure numbers are numbers (Google Sheets might return strings)
+    // Ensure numbers are numbers and arrays are arrays
     return data.map((b: any) => ({
         ...b,
         pricePerDay: Number(b.pricePerDay),
         diaperCost: Number(b.diaperCost),
         damageCost: Number(b.damageCost),
-        createdAt: Number(b.createdAt)
+        createdAt: Number(b.createdAt),
+        // Google sheets might return "null" string or empty string for JSON columns
+        expenses: Array.isArray(b.expenses) ? b.expenses : []
     }));
   } catch (e) {
     console.error("Failed to fetch bookings", e);

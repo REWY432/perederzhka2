@@ -1,3 +1,4 @@
+
 export enum DogSize {
   SMALL = 'SMALL',
   MEDIUM = 'MEDIUM',
@@ -5,10 +6,16 @@ export enum DogSize {
 }
 
 export enum BookingStatus {
+  WAITLIST = 'WAITLIST',
   REQUEST = 'REQUEST',
   CONFIRMED = 'CONFIRMED',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED'
+}
+
+export interface ExpenseItem {
+  title: string;
+  amount: number;
 }
 
 export interface Booking {
@@ -19,12 +26,18 @@ export interface Booking {
   checkIn: string; // ISO Date String YYYY-MM-DD
   checkOut: string; // ISO Date String YYYY-MM-DD
   pricePerDay: number;
-  diaperCost: number;
-  damageCost: number;
+  
+  // Legacy fields (kept for backward compatibility)
+  diaperCost?: number;
+  damageCost?: number;
+
+  // New flexible expenses
+  expenses?: ExpenseItem[];
+
   comment?: string;
   tags?: string[];
-  checklist?: string[]; // New: Items brought (Food, Meds, etc.)
-  vaccineExpires?: string; // New: Vaccination expiration date
+  checklist?: string[];
+  vaccineExpires?: string;
   photoUrl?: string;
   status: BookingStatus;
   createdAt: number;
@@ -34,6 +47,12 @@ export interface Stats {
   currentDogs: number;
   revenueMonth: number;
   bookingsNextMonth: number;
+}
+
+export interface GapMatch {
+  booking: Booking;
+  revenue: number;
+  gapType: 'PERFECT' | 'FIT';
 }
 
 // Pricing Constants

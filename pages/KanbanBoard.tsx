@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Booking, BookingStatus, AVAILABLE_TAGS } from '../types';
 import { calculateTotal, calculateDays, formatDate } from '../services/mockBackend';
-import { Calendar, DollarSign, GripVertical, AlertCircle, CheckCircle2, XCircle, Clock, Image as ImageIcon } from 'lucide-react';
+import { Calendar, DollarSign, GripVertical, AlertCircle, CheckCircle2, XCircle, Clock, Image as ImageIcon, ChevronLeft, ChevronRight, Hourglass } from 'lucide-react';
 import ClientCard from '../components/ClientCard';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
 }
 
 const COLUMNS = [
+  { id: BookingStatus.WAITLIST, title: 'Лист ожидания', color: 'bg-indigo-500', icon: Hourglass, bg: 'bg-indigo-100/30 dark:bg-indigo-900/20' },
   { id: BookingStatus.REQUEST, title: 'Заявки', color: 'bg-amber-500', icon: Clock, bg: 'bg-amber-100/30 dark:bg-amber-900/20' },
   { id: BookingStatus.CONFIRMED, title: 'Подтверждено', color: 'bg-teal-500', icon: CheckCircle2, bg: 'bg-teal-100/30 dark:bg-teal-900/20' },
   { id: BookingStatus.COMPLETED, title: 'Завершено', color: 'bg-blue-500', icon: CheckCircle2, bg: 'bg-blue-100/30 dark:bg-blue-900/20' },
@@ -24,7 +25,6 @@ const KanbanBoard: React.FC<Props> = ({ bookings, onStatusChange }) => {
   const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedId(id);
     e.dataTransfer.effectAllowed = 'move';
-    // Transparent drag image hack if needed, but default is usually fine
   };
 
   const handleDragOver = (e: React.DragEvent, status: BookingStatus) => {
@@ -47,16 +47,27 @@ const KanbanBoard: React.FC<Props> = ({ bookings, onStatusChange }) => {
       .sort((a, b) => b.createdAt - a.createdAt);
   };
 
+  const moveCard = (bookingId: string, currentStatus: BookingStatus, direction: 'prev' | 'next') => {
+      const currentIndex = COLUMNS.findIndex(c => c.id === currentStatus);
+      if (currentIndex === -1) return;
+      
+      const nextIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+      
+      if (nextIndex >= 0 && nextIndex < COLUMNS.length) {
+          onStatusChange(bookingId, COLUMNS[nextIndex].id as BookingStatus);
+      }
+  };
+
   return (
     <div className="h-full flex flex-col space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-white drop-shadow-md">Доска задач</h2>
-        <p className="text-white/80 font-medium">Перетаскивайте карточки для смены статуса. Нажмите на имя для истории.</p>
+        <p className="text-white/80 font-medium">Перетаскивайте карточки для смены статуса.</p>
       </div>
 
       <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
-        <div className="flex gap-6 h-full min-w-[1000px]">
-          {COLUMNS.map(col => {
+        <div className="flex gap-4 md:gap-6 h-full w-max md:min-w-[1000px]">
+          {COLUMNS.map((col, colIndex) => {
             const items = getColumnBookings(col.id as BookingStatus);
             const isDragOver = dragOverColumn === col.id;
             const Icon = col.icon;
@@ -66,7 +77,7 @@ const KanbanBoard: React.FC<Props> = ({ bookings, onStatusChange }) => {
                 key={col.id}
                 onDragOver={(e) => handleDragOver(e, col.id as BookingStatus)}
                 onDrop={(e) => handleDrop(e, col.id as BookingStatus)}
-                className={`flex-1 min-w-[300px] flex flex-col rounded-3xl transition-all duration-300 border backdrop-blur-xl ${
+                className={`w-[85vw] md:w-auto md:flex-1 md:min-w-[300px] flex flex-col rounded-3xl transition-all duration-300 border backdrop-blur-xl ${
                   isDragOver 
                     ? 'bg-white/40 dark:bg-white/20 border-white scale-[1.02] shadow-2xl' 
                     : `border-white/20 ${col.bg} shadow-[0_8px_32px_0_rgba(31,38,135,0.07)]`
@@ -100,13 +111,9 @@ const KanbanBoard: React.FC<Props> = ({ bookings, onStatusChange }) => {
                        >
                          <div className="flex justify-between items-start mb-2">
                             <div className="flex items-center gap-2">
-                               {booking.photoUrl ? (
-                                   <img src={booking.photoUrl} alt="Dog" className="w-8 h-8 rounded-full object-cover border border-white/50" />
-                               ) : (
-                                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center text-xs font-bold text-gray-500">
-                                      {booking.dogName[0]}
-                                   </div>
-                               )}
+                               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center text-xs font-bold text-gray-500">
+                                   {booking.dogName[0]}
+                               </div>
                                <div>
                                   <button onClick={() => setSelectedClientName(booking.dogName)} className="font-bold text-gray-900 dark:text-white leading-tight hover:text-teal-500 dark:hover:text-teal-400 text-left">
                                       {booking.dogName}
@@ -114,7 +121,9 @@ const KanbanBoard: React.FC<Props> = ({ bookings, onStatusChange }) => {
                                   <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase">{booking.breed}</p>
                                </div>
                             </div>
-                            <GripVertical size={16} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="hidden md:block">
+                                <GripVertical size={16} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
                          </div>
                          
                          <div className="space-y-2 mt-3">
@@ -128,39 +137,30 @@ const KanbanBoard: React.FC<Props> = ({ bookings, onStatusChange }) => {
                                   <DollarSign size={14} className="text-emerald-600 dark:text-emerald-400" />
                                   {total.toLocaleString()} ₽
                                </div>
-                               <span className="text-[10px] bg-white/50 dark:bg-white/10 px-2 py-0.5 rounded text-gray-500">
-                                 {days} дн.
-                               </span>
                             </div>
                          </div>
 
-                         {/* Tags */}
-                         {booking.tags && booking.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-white/20 dark:border-white/5">
-                               {booking.tags.slice(0, 3).map(tag => {
-                                  const tagStyle = AVAILABLE_TAGS.find(t => t.label === tag);
-                                  return (
-                                    <span key={tag} className={`text-[9px] px-1.5 py-0.5 rounded font-bold text-white ${tagStyle?.color || 'bg-gray-400'}`}>
-                                       {tag}
-                                    </span>
-                                  )
-                               })}
-                               {booking.tags.length > 3 && (
-                                 <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-gray-200 dark:bg-gray-700 text-gray-500">
-                                   +{booking.tags.length - 3}
-                                 </span>
-                               )}
-                            </div>
-                         )}
+                         {/* Mobile Move Controls */}
+                         <div className="flex justify-between items-center mt-3 pt-3 border-t border-white/20 dark:border-white/5 md:hidden">
+                            <button 
+                                onClick={() => moveCard(booking.id, booking.status, 'prev')}
+                                disabled={colIndex === 0}
+                                className={`p-1.5 rounded-lg ${colIndex === 0 ? 'text-gray-300 cursor-not-allowed' : 'bg-white/50 text-gray-700'}`}
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                            <span className="text-[10px] font-bold text-gray-400">Переместить</span>
+                            <button 
+                                onClick={() => moveCard(booking.id, booking.status, 'next')}
+                                disabled={colIndex === COLUMNS.length - 1}
+                                className={`p-1.5 rounded-lg ${colIndex === COLUMNS.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'bg-white/50 text-gray-700'}`}
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                         </div>
                        </div>
                      );
                    })}
-                   
-                   {items.length === 0 && (
-                      <div className="h-24 flex items-center justify-center border-2 border-dashed border-white/20 rounded-xl text-gray-400 text-sm font-medium">
-                        Пусто
-                      </div>
-                   )}
                 </div>
               </div>
             );

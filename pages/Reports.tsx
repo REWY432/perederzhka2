@@ -10,19 +10,35 @@ interface Props {
 const Reports: React.FC<Props> = ({ bookings }) => {
   const completedOrConfirmed = bookings.filter(b => b.status === BookingStatus.COMPLETED || b.status === BookingStatus.CONFIRMED);
 
-  // 1. Monthly Income (Last 12 Months)
+  // 1. Monthly Income (Correctly Sorted Chronologically)
   const getMonthlyData = () => {
-    const data: Record<string, number> = {};
+    const data: Record<string, { total: number, date: Date }> = {};
     const months = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
     
     completedOrConfirmed.forEach(b => {
       const date = new Date(b.checkIn);
-      const key = `${months[date.getMonth()]} ${date.getFullYear()}`;
+      // Key format: YYYY-MM to ensure correct sorting later, we will use display label separately
+      const sortKey = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`;
+      const displayLabel = `${months[date.getMonth()]} ${date.getFullYear()}`;
+      
       const total = calculateTotal(b);
-      data[key] = (data[key] || 0) + total;
+      
+      if (!data[sortKey]) {
+          data[sortKey] = { total: 0, date: date };
+      }
+      data[sortKey].total += total;
     });
 
-    return Object.keys(data).map(key => ({ name: key, value: data[key] }));
+    // Convert to array and sort by key (YYYY-MM)
+    return Object.keys(data)
+      .sort() // Strings YYYY-MM sort correctly alphabetically
+      .map(key => {
+         const d = data[key].date;
+         return {
+            name: `${months[d.getMonth()]} ${d.getFullYear()}`,
+            value: data[key].total
+         };
+      });
   };
 
   const monthlyData = getMonthlyData();
@@ -69,11 +85,16 @@ const Reports: React.FC<Props> = ({ bookings }) => {
   // 4. Expense Analysis
   const expenseStats = completedOrConfirmed.reduce(
     (acc, curr) => {
-      acc.diapers += (curr.diaperCost || 0);
-      acc.damages += (curr.damageCost || 0);
+      // Sum up array expenses
+      const expenseListTotal = (curr.expenses || []).reduce((s, i) => s + i.amount, 0);
+      
+      // Separate Legacy costs if needed, but for total calculation we group them
+      acc.total += expenseListTotal + (curr.diaperCost || 0) + (curr.damageCost || 0);
+      
+      // We can also try to categorize if we had categories, for now just totals
       return acc;
     },
-    { diapers: 0, damages: 0 }
+    { total: 0 }
   );
 
   return (
@@ -137,48 +158,16 @@ const Reports: React.FC<Props> = ({ bookings }) => {
             </ResponsiveContainer>
           </div>
         </div>
-
-        {/* Top Dogs Chart */}
-        <div className="bg-white/40 dark:bg-black/40 backdrop-blur-xl border border-white/50 dark:border-white/10 p-6 rounded-3xl shadow-[0_8px_32px_0_rgba(31,38,135,0.07)]">
-          <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-6 text-lg">Топ-10 Клиентов (по деньгам)</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topDogs} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.5)" />
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" width={80} tick={{fontSize: 12, fill: '#9ca3af'}} axisLine={false} tickLine={false} />
-                <Tooltip 
-                  cursor={{fill: 'rgba(255,255,255,0.1)'}}
-                  contentStyle={{ backgroundColor: 'rgba(30,30,30,0.8)', backdropFilter: 'blur(10px)', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', color: '#fff' }}
-                  formatter={(value) => `${Number(value).toLocaleString()} ₽`} 
-                />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={20}>
-                  {topDogs.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill="#f59e0b" />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            {topDogs.length === 0 && <p className="text-center text-gray-500 mt-4">Нет данных.</p>}
-          </div>
-        </div>
       </div>
 
       {/* Expense Summary */}
       <div className="bg-white/40 dark:bg-black/40 backdrop-blur-xl border border-white/50 dark:border-white/10 p-6 rounded-3xl shadow-[0_8px_32px_0_rgba(31,38,135,0.07)]">
         <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4 text-lg">Сводка расходов</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-           <div className="p-5 bg-red-100/50 dark:bg-red-900/30 backdrop-blur-md rounded-2xl border border-red-100/50 dark:border-red-900/50">
-             <p className="text-red-700 dark:text-red-300 text-sm font-bold uppercase tracking-wider">Памперсы и расходники</p>
-             <p className="text-3xl font-bold text-gray-800 dark:text-white mt-2">{expenseStats.diapers.toLocaleString()} ₽</p>
-           </div>
-           <div className="p-5 bg-orange-100/50 dark:bg-orange-900/30 backdrop-blur-md rounded-2xl border border-orange-100/50 dark:border-orange-900/50">
-             <p className="text-orange-700 dark:text-orange-300 text-sm font-bold uppercase tracking-wider">Ущерб и ремонт</p>
-             <p className="text-3xl font-bold text-gray-800 dark:text-white mt-2">{expenseStats.damages.toLocaleString()} ₽</p>
-           </div>
-           <div className="p-5 bg-white/40 dark:bg-white/10 backdrop-blur-md rounded-2xl border border-white/50 dark:border-white/10">
-             <p className="text-gray-600 dark:text-gray-300 text-sm font-bold uppercase tracking-wider">Всего расходов</p>
-             <p className="text-3xl font-bold text-gray-800 dark:text-white mt-2">{(expenseStats.diapers + expenseStats.damages).toLocaleString()} ₽</p>
+        <div className="flex items-center gap-6">
+           <div className="p-5 bg-red-100/50 dark:bg-red-900/30 backdrop-blur-md rounded-2xl border border-red-100/50 dark:border-red-900/50 flex-1">
+             <p className="text-red-700 dark:text-red-300 text-sm font-bold uppercase tracking-wider">Общие расходы</p>
+             <p className="text-3xl font-bold text-gray-800 dark:text-white mt-2">{expenseStats.total.toLocaleString()} ₽</p>
+             <p className="text-xs text-gray-500 mt-2">Включая закупку корма, расходники и ремонт</p>
            </div>
         </div>
       </div>
