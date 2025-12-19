@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Booking, BookingStatus, AVAILABLE_TAGS, DogSize } from '../types';
 import { calculateTotal, calculateDays, formatDate } from '../services/mockBackend';
-import { Edit2, Trash2, ChevronDown, Receipt, Printer, Image as ImageIcon, Search, Filter, XCircle, ScrollText } from 'lucide-react';
+import { Edit2, Trash2, ChevronDown, Receipt, Printer, Image as ImageIcon, Search, Filter, XCircle, ScrollText, Calendar } from 'lucide-react';
 import ClientCard from '../components/ClientCard';
 
 interface Props {
@@ -67,7 +67,7 @@ const BookingsList: React.FC<Props> = ({ bookings, onEdit, onDelete, onStatusCha
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 md:pb-0">
       {/* Print Styles */}
       <style>{`
         @media print {
@@ -107,7 +107,7 @@ const BookingsList: React.FC<Props> = ({ bookings, onEdit, onDelete, onStatusCha
       `}</style>
 
       <div>
-          <h2 className="text-3xl font-bold text-white drop-shadow-md mb-4">Реестр бронирований</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-white drop-shadow-md mb-4">Реестр бронирований</h2>
           
           {/* Controls Bar */}
           <div className="bg-white/40 dark:bg-black/40 backdrop-blur-xl border border-white/50 dark:border-white/10 p-4 rounded-3xl shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] flex flex-col xl:flex-row gap-4 justify-between items-center">
@@ -131,54 +131,18 @@ const BookingsList: React.FC<Props> = ({ bookings, onEdit, onDelete, onStatusCha
 
              {/* Filters Group */}
              <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-                 <div className="flex items-center gap-2 text-white/80 dark:text-white/60 text-sm font-bold mr-2">
-                    <Filter size={16} />
-                    <span className="hidden sm:inline">Фильтры:</span>
-                 </div>
-
                  {/* Status Filter */}
-                 <div className="relative flex-1 sm:flex-none">
+                 <div className="relative flex-1 sm:flex-none min-w-[140px]">
                      <select 
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="w-full appearance-none pl-4 pr-9 py-2.5 bg-white/50 dark:bg-black/20 border border-white/30 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/50 text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-pointer shadow-sm hover:bg-white/60 dark:hover:bg-black/30 transition-colors"
+                        className="w-full appearance-none pl-4 pr-8 py-2.5 bg-white/50 dark:bg-black/20 border border-white/30 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/50 text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-pointer shadow-sm"
                      >
                         <option value="ALL">Все статусы</option>
                         {Object.values(BookingStatus).map(s => (
                             <option key={s} value={s}>{getStatusLabel(s)}</option>
                         ))}
                      </select>
-                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={14} />
-                 </div>
-
-                 {/* Size Filter */}
-                 <div className="relative flex-1 sm:flex-none">
-                     <select 
-                        value={sizeFilter}
-                        onChange={(e) => setSizeFilter(e.target.value)}
-                        className="w-full appearance-none pl-4 pr-9 py-2.5 bg-white/50 dark:bg-black/20 border border-white/30 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/50 text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-pointer shadow-sm hover:bg-white/60 dark:hover:bg-black/30 transition-colors"
-                     >
-                        <option value="ALL">Все размеры</option>
-                        {Object.values(DogSize).map(s => (
-                            <option key={s} value={s}>{getSizeLabel(s)}</option>
-                        ))}
-                     </select>
-                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={14} />
-                 </div>
-
-                 {/* Tag Filter */}
-                 <div className="relative flex-1 sm:flex-none">
-                     <select 
-                        value={tagFilter}
-                        onChange={(e) => setTagFilter(e.target.value)}
-                        className="w-full appearance-none pl-4 pr-9 py-2.5 bg-white/50 dark:bg-black/20 border border-white/30 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/50 text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-pointer shadow-sm hover:bg-white/60 dark:hover:bg-black/30 transition-colors"
-                     >
-                        <option value="ALL">Все метки</option>
-                        {AVAILABLE_TAGS.map(t => (
-                            <option key={t.label} value={t.label}>{t.label}</option>
-                        ))}
-                     </select>
-                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={14} />
                  </div>
 
                  {/* Reset Button */}
@@ -195,7 +159,8 @@ const BookingsList: React.FC<Props> = ({ bookings, onEdit, onDelete, onStatusCha
           </div>
       </div>
 
-      <div className="bg-white/40 dark:bg-black/40 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-3xl shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] overflow-hidden">
+      {/* Desktop Table View */}
+      <div className="hidden md:block bg-white/40 dark:bg-black/40 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-3xl shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] overflow-hidden">
         <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead className="bg-white/30 dark:bg-black/20 text-gray-700 dark:text-gray-300 font-bold text-xs uppercase tracking-wider">
@@ -301,6 +266,82 @@ const BookingsList: React.FC<Props> = ({ bookings, onEdit, onDelete, onStatusCha
         </div>
       </div>
 
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4">
+        {filteredBookings.length > 0 ? (
+          filteredBookings.sort((a,b) => b.createdAt - a.createdAt).map(booking => {
+            const total = calculateTotal(booking);
+            return (
+              <div key={booking.id} className="bg-white/70 dark:bg-black/40 backdrop-blur-xl border border-white/50 dark:border-white/10 p-5 rounded-2xl shadow-sm">
+                 <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-3">
+                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center text-white font-bold text-lg shadow">
+                          {booking.dogName[0]}
+                       </div>
+                       <div>
+                          <button onClick={() => setSelectedClientName(booking.dogName)} className="font-bold text-gray-900 dark:text-white text-lg">
+                             {booking.dogName}
+                          </button>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{booking.breed}</p>
+                       </div>
+                    </div>
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        booking.status === BookingStatus.CONFIRMED ? 'bg-green-100 text-green-700' : 
+                        booking.status === BookingStatus.REQUEST ? 'bg-amber-100 text-amber-700' :
+                        booking.status === BookingStatus.CANCELLED ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {getStatusLabel(booking.status)}
+                    </span>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 dark:text-gray-300 mb-4 bg-white/40 dark:bg-white/5 p-3 rounded-xl">
+                    <div className="flex flex-col">
+                       <span className="text-[10px] text-gray-400 uppercase font-bold">Заезд</span>
+                       <span className="font-semibold">{formatDate(booking.checkIn)}</span>
+                    </div>
+                    <div className="flex flex-col text-right">
+                       <span className="text-[10px] text-gray-400 uppercase font-bold">Выезд</span>
+                       <span className="font-semibold">{formatDate(booking.checkOut)}</span>
+                    </div>
+                 </div>
+
+                 <div className="flex justify-between items-center mb-4">
+                    <div className="font-bold text-xl text-gray-900 dark:text-white">{total.toLocaleString()} ₽</div>
+                    <div className="flex gap-1">
+                        {booking.tags?.slice(0,3).map(t => (
+                            <span key={t} className="w-2 h-2 rounded-full bg-teal-500"></span>
+                        ))}
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-4 gap-2">
+                    <button onClick={() => setReceiptBooking(booking)} className="flex flex-col items-center justify-center py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 rounded-lg">
+                       <Receipt size={16} />
+                       <span className="text-[10px] font-bold mt-1">Чек</span>
+                    </button>
+                    <button onClick={() => setContractBooking(booking)} className="flex flex-col items-center justify-center py-2 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg">
+                       <ScrollText size={16} />
+                       <span className="text-[10px] font-bold mt-1">Дог.</span>
+                    </button>
+                    <button onClick={() => onEdit(booking)} className="flex flex-col items-center justify-center py-2 bg-teal-50 dark:bg-teal-900/20 text-teal-700 rounded-lg">
+                       <Edit2 size={16} />
+                       <span className="text-[10px] font-bold mt-1">Изм.</span>
+                    </button>
+                    <button onClick={() => onDelete(booking.id)} className="flex flex-col items-center justify-center py-2 bg-red-50 dark:bg-red-900/20 text-red-700 rounded-lg">
+                       <Trash2 size={16} />
+                       <span className="text-[10px] font-bold mt-1">Удал.</span>
+                    </button>
+                 </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="text-center py-10 text-gray-500">
+             <p>Ничего не найдено</p>
+          </div>
+        )}
+      </div>
+
       {/* CRM Client Card Modal */}
       {selectedClientName && (
         <ClientCard 
@@ -314,20 +355,23 @@ const BookingsList: React.FC<Props> = ({ bookings, onEdit, onDelete, onStatusCha
       {contractBooking && (
          <div id="contract-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto modal-overlay">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm no-print" onClick={() => setContractBooking(null)}></div>
-            <div className="relative bg-white text-black p-10 max-w-3xl w-full shadow-2xl min-h-[80vh] modal-content">
+            <div className="relative bg-white text-black p-6 md:p-10 max-w-3xl w-full shadow-2xl min-h-[80vh] modal-content rounded-xl md:rounded-none">
+               <div className="flex justify-end no-print mb-4 md:hidden">
+                   <button onClick={() => setContractBooking(null)} className="p-2 bg-gray-100 rounded-full"><XCircle size={24}/></button>
+               </div>
                <div className="max-w-2xl mx-auto space-y-6">
-                  <h1 className="text-2xl font-bold text-center uppercase border-b-2 border-black pb-4 mb-8">Договор передержки животного № {contractBooking.id.substring(0,5)}</h1>
+                  <h1 className="text-xl md:text-2xl font-bold text-center uppercase border-b-2 border-black pb-4 mb-8">Договор передержки № {contractBooking.id.substring(0,5)}</h1>
                   
-                  <p className="text-justify">
+                  <p className="text-justify text-sm md:text-base">
                      г. Москва, {new Date().toLocaleDateString('ru-RU')}
                   </p>
                   
-                  <p className="text-justify">
+                  <p className="text-justify text-sm md:text-base">
                      Гостиница для животных <b>"DogStay"</b>, именуемая в дальнейшем «Исполнитель», и Владелец животного, именуемый в дальнейшем «Заказчик», заключили настоящий Договор о нижеследующем:
                   </p>
 
-                  <h3 className="font-bold text-lg mt-4">1. Предмет договора</h3>
-                  <p className="text-justify">
+                  <h3 className="font-bold text-base md:text-lg mt-4">1. Предмет договора</h3>
+                  <p className="text-justify text-sm md:text-base">
                      1.1. Исполнитель обязуется оказать услуги по временному содержанию (передержке) животного:<br/>
                      <b>Кличка:</b> {contractBooking.dogName}<br/>
                      <b>Порода:</b> {contractBooking.breed}<br/>
@@ -335,35 +379,35 @@ const BookingsList: React.FC<Props> = ({ bookings, onEdit, onDelete, onStatusCha
                      в период с <b>{formatDate(contractBooking.checkIn)}</b> по <b>{formatDate(contractBooking.checkOut)}</b>.
                   </p>
 
-                  <h3 className="font-bold text-lg mt-4">2. Стоимость услуг</h3>
-                  <p className="text-justify">
+                  <h3 className="font-bold text-base md:text-lg mt-4">2. Стоимость услуг</h3>
+                  <p className="text-justify text-sm md:text-base">
                      2.1. Стоимость передержки составляет <b>{contractBooking.pricePerDay} рублей</b> в сутки.<br/>
                      2.2. Общая стоимость услуг по договору: <b>{calculateTotal(contractBooking)} рублей</b>.<br/>
                      2.3. Дополнительные расходы (корм, лечение, ущерб) оплачиваются отдельно.
                   </p>
 
-                  <h3 className="font-bold text-lg mt-4">3. Обязательства сторон</h3>
-                  <p className="text-justify">
+                  <h3 className="font-bold text-base md:text-lg mt-4">3. Обязательства сторон</h3>
+                  <p className="text-justify text-sm md:text-base">
                      3.1. Заказчик подтверждает, что животное здорово, привито (Дата вакцинации: {contractBooking.vaccineExpires ? formatDate(contractBooking.vaccineExpires) : 'Не указана'}) и не имеет инфекционных заболеваний.<br/>
                      3.2. Исполнитель обязуется кормить, выгуливать и содержать животное в надлежащих условиях.
                   </p>
 
-                  <div className="grid grid-cols-2 gap-12 mt-12 pt-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mt-12 pt-8">
                      <div>
                         <p className="font-bold mb-4">Исполнитель:</p>
                         <p>DogStay Hotel</p>
-                        <div className="h-20 border-b border-black mt-8"></div>
+                        <div className="h-12 md:h-20 border-b border-black mt-8"></div>
                         <p className="text-xs text-gray-500 text-center mt-1">(Подпись / М.П.)</p>
                      </div>
                      <div>
                         <p className="font-bold mb-4">Заказчик:</p>
                         <p>ФИО: ______________________</p>
-                        <div className="h-20 border-b border-black mt-8"></div>
+                        <div className="h-12 md:h-20 border-b border-black mt-8"></div>
                         <p className="text-xs text-gray-500 text-center mt-1">(Подпись)</p>
                      </div>
                   </div>
 
-                  <div className="no-print fixed bottom-8 right-8 flex gap-4">
+                  <div className="no-print fixed bottom-8 right-8 hidden md:flex gap-4">
                       <button onClick={() => setContractBooking(null)} className="px-6 py-3 bg-gray-200 hover:bg-gray-300 rounded-xl font-bold text-gray-800 shadow-lg">Закрыть</button>
                       <button onClick={handlePrint} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold text-white shadow-lg flex items-center gap-2"><Printer/> Печать</button>
                   </div>
@@ -377,7 +421,7 @@ const BookingsList: React.FC<Props> = ({ bookings, onEdit, onDelete, onStatusCha
         <div id="receipt-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto modal-overlay">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm no-print" onClick={() => setReceiptBooking(null)}></div>
           
-          <div id="receipt-content" className="relative bg-white text-gray-900 rounded-sm shadow-2xl w-full max-w-md p-8 min-h-[500px] flex flex-col modal-content">
+          <div id="receipt-content" className="relative bg-white text-gray-900 rounded-xl md:rounded-sm shadow-2xl w-full max-w-md p-6 md:p-8 min-h-[500px] flex flex-col modal-content">
             
             {/* Header */}
             <div className="text-center border-b-2 border-gray-100 pb-6 mb-6">
@@ -386,7 +430,7 @@ const BookingsList: React.FC<Props> = ({ bookings, onEdit, onDelete, onStatusCha
                     <Receipt size={24} />
                  </div>
                </div>
-               <h1 className="text-2xl font-bold tracking-tight uppercase">Гостиница DogStay</h1>
+               <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">Гостиница DogStay</h1>
                <p className="text-gray-500 text-xs mt-1 tracking-widest">КВИТАНЦИЯ</p>
                <p className="text-gray-400 text-xs mt-1">{new Date().toLocaleDateString('ru-RU')} • #{receiptBooking.id.substring(0,8).toUpperCase()}</p>
             </div>
