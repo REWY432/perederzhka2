@@ -1,0 +1,5 @@
+{
+  "name": "DogStay Manager",
+  "description": "A comprehensive dashboard for dog boarding management. Features include booking tracking, occupancy calendar, automatic price calculation based on breed size, expense tracking (diapers, repairs).",
+  "requestFramePermissions": []
+}
