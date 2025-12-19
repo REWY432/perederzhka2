@@ -1,4 +1,6 @@
+
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Booking, BookingStatus, AVAILABLE_TAGS, DogSize } from '../types';
 import { calculateTotal, calculateDays, formatDate } from '../services/mockBackend';
 import { Edit2, Trash2, ChevronDown, Receipt, Printer, Image as ImageIcon, Search, Filter, XCircle, ScrollText, Calendar, Share, Dog, Hourglass, ArrowRight } from 'lucide-react';
@@ -429,20 +431,21 @@ const BookingsList: React.FC<Props> = ({ bookings, onEdit, onDelete, onStatusCha
         )}
       </div>
 
-      {/* CRM Client Card Modal */}
-      {selectedClientName && (
+      {/* CRM Client Card Modal - Portaled to Body to avoid Z-Index issues */}
+      {selectedClientName && createPortal(
         <ClientCard 
             dogName={selectedClientName} 
             allBookings={bookings} 
             onClose={() => setSelectedClientName(null)} 
-        />
+        />,
+        document.body
       )}
 
-      {/* Contract Modal */}
-      {contractBooking && (
-         <div id="contract-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto modal-overlay">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm no-print" onClick={() => setContractBooking(null)}></div>
-            <div className="relative bg-white text-black p-6 md:p-10 max-w-3xl w-full shadow-2xl min-h-[80vh] modal-content rounded-xl md:rounded-none">
+      {/* Contract Modal - Portaled */}
+      {contractBooking && createPortal(
+         <div id="contract-modal" className="fixed inset-0 z-[60] flex items-center justify-center p-4 overflow-y-auto modal-overlay">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm no-print" onClick={() => setContractBooking(null)}></div>
+            <div className="relative bg-white text-black p-6 md:p-10 max-w-3xl w-full shadow-2xl min-h-[80vh] modal-content rounded-xl md:rounded-none overflow-y-auto max-h-[90vh]">
                <div className="flex justify-end no-print mb-4 md:hidden">
                    <button onClick={() => setContractBooking(null)} className="p-2 bg-gray-100 rounded-full"><XCircle size={24}/></button>
                </div>
@@ -500,116 +503,121 @@ const BookingsList: React.FC<Props> = ({ bookings, onEdit, onDelete, onStatusCha
                   </div>
                </div>
             </div>
-         </div>
+         </div>,
+         document.body
       )}
 
-      {/* Modern Receipt Modal */}
-      {receiptBooking && (
-        <div id="receipt-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto modal-overlay">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm no-print" onClick={() => setReceiptBooking(null)}></div>
+      {/* Modern Receipt Modal - Portaled */}
+      {receiptBooking && createPortal(
+        <div id="receipt-modal" className="fixed inset-0 z-[60] overflow-y-auto modal-overlay">
+          {/* Backdrop */}
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm no-print" onClick={() => setReceiptBooking(null)}></div>
           
-          <div className="relative bg-white text-gray-900 shadow-2xl w-full max-w-sm flex flex-col modal-content font-sans rounded-2xl md:rounded-2xl">
-            
-            <div className="p-8 pb-4 flex flex-col items-center">
-                 {/* Dog Icon */}
-                 <div className="mb-4">
-                     <img src="https://cdn-icons-png.flaticon.com/512/616/616408.png" alt="DogStay Logo" className="w-16 h-16 object-contain" />
-                 </div>
-                 
-                 <h1 className="text-xl font-bold uppercase tracking-wider text-gray-800">ВЫЕЗДНОЙ ЛИСТ</h1>
-                 <p className="text-sm text-gray-500 mt-1">
-                     {new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
-                 </p>
-            </div>
-
-            <div className="px-6">
-                 <div className="border-t-2 border-dashed border-gray-200 my-2"></div>
-            </div>
-
-            <div className="px-8 py-4 text-center">
-                 <h2 className="text-2xl font-bold text-gray-900">{receiptBooking.dogName}</h2>
-                 <p className="text-gray-500">{receiptBooking.breed}</p>
-            </div>
-
-            <div className="px-8 py-2 space-y-2">
-                 <div className="flex justify-between text-sm font-medium">
-                      <span className="text-gray-800">Заезд</span>
-                      <span className="text-gray-800">{formatShortDate(receiptBooking.checkIn)}</span>
-                 </div>
-                 <div className="flex justify-between text-sm font-medium">
-                      <span className="text-gray-800">Выезд</span>
-                      <span className="text-gray-800">{formatShortDate(receiptBooking.checkOut)}</span>
-                 </div>
-            </div>
-
-            <div className="px-6">
-                 <div className="border-t-2 border-dashed border-gray-200 my-4"></div>
-            </div>
-
-            <div className="px-8 space-y-3 text-sm">
-                {/* Accommodation */}
-                <div className="flex justify-between">
-                    <span className="text-gray-600">Проживание ({calculateDays(receiptBooking.checkIn, receiptBooking.checkOut)} дн.)</span>
-                    <span className="font-bold text-gray-900">{(calculateDays(receiptBooking.checkIn, receiptBooking.checkOut) * receiptBooking.pricePerDay).toLocaleString()} ₽</span>
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="relative bg-white text-gray-900 shadow-2xl w-full max-w-sm flex flex-col modal-content font-sans rounded-2xl md:rounded-2xl overflow-hidden">
+                
+                <div className="p-8 pb-4 flex flex-col items-center">
+                    {/* Dog Icon */}
+                    <div className="mb-4">
+                        <img src="https://cdn-icons-png.flaticon.com/512/616/616408.png" alt="DogStay Logo" className="w-16 h-16 object-contain" />
+                    </div>
+                    
+                    <h1 className="text-xl font-bold uppercase tracking-wider text-gray-800">ВЫЕЗДНОЙ ЛИСТ</h1>
+                    <p className="text-sm text-gray-500 mt-1">
+                        {new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </p>
                 </div>
 
-                {/* Expenses */}
-                {receiptBooking.expenses && receiptBooking.expenses.map((ex, i) => (
-                    <div key={i} className="flex justify-between">
-                         <span className="text-gray-600">{ex.title}</span>
-                         <span className="font-bold text-gray-900">{ex.amount.toLocaleString()} ₽</span>
-                    </div>
-                ))}
-
-                {/* Legacy */}
-                {(receiptBooking.diaperCost > 0) && (
-                    <div className="flex justify-between">
-                         <span className="text-gray-600">Памперсы</span>
-                         <span className="font-bold text-gray-900">{receiptBooking.diaperCost.toLocaleString()} ₽</span>
-                    </div>
-                )}
-                {(receiptBooking.damageCost > 0) && (
-                    <div className="flex justify-between">
-                         <span className="text-gray-600">Ущерб</span>
-                         <span className="font-bold text-gray-900">{receiptBooking.damageCost.toLocaleString()} ₽</span>
-                    </div>
-                )}
-            </div>
-
-            <div className="px-6 mt-2">
-               <div className="border-t-2 border-black my-4"></div>
-            </div>
-
-            <div className="px-8 pb-4">
-                <div className="flex justify-between items-center">
-                    <span className="font-bold text-xl uppercase text-gray-900">ИТОГО</span>
-                    <span className="font-black text-2xl text-blue-600">{calculateTotal(receiptBooking).toLocaleString()} ₽</span>
+                <div className="px-6">
+                    <div className="border-t-2 border-dashed border-gray-200 my-2"></div>
                 </div>
-            </div>
 
-            <div className="px-8 py-8 text-center">
-                <p className="text-gray-500 italic text-sm">Спасибо, что доверили нам {receiptBooking.dogName}!</p>
-                <p className="text-gray-500 italic text-sm flex items-center justify-center gap-1">Ждем вас снова! <span className="text-red-500">❤</span></p>
-            </div>
-            
-            {/* Controls */}
-            <div className="no-print bg-gray-50 p-4 flex gap-3 mt-auto rounded-b-2xl">
-               <button 
-                 onClick={() => setReceiptBooking(null)} 
-                 className="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-200 rounded-lg transition-colors text-sm"
-               >
-                 Закрыть
-               </button>
-               <button 
-                 onClick={handlePrint} 
-                 className="flex-1 py-3 bg-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 text-sm shadow-lg"
-               >
-                 <Printer size={16} /> Печать
-               </button>
-            </div>
+                <div className="px-8 py-4 text-center">
+                    <h2 className="text-2xl font-bold text-gray-900">{receiptBooking.dogName}</h2>
+                    <p className="text-gray-500">{receiptBooking.breed}</p>
+                </div>
 
+                <div className="px-8 py-2 space-y-2">
+                    <div className="flex justify-between text-sm font-medium">
+                        <span className="text-gray-800">Заезд</span>
+                        <span className="text-gray-800">{formatShortDate(receiptBooking.checkIn)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-medium">
+                        <span className="text-gray-800">Выезд</span>
+                        <span className="text-gray-800">{formatShortDate(receiptBooking.checkOut)}</span>
+                    </div>
+                </div>
+
+                <div className="px-6">
+                    <div className="border-t-2 border-dashed border-gray-200 my-4"></div>
+                </div>
+
+                <div className="px-8 space-y-3 text-sm">
+                    {/* Accommodation */}
+                    <div className="flex justify-between">
+                        <span className="text-gray-600">Проживание ({calculateDays(receiptBooking.checkIn, receiptBooking.checkOut)} дн.)</span>
+                        <span className="font-bold text-gray-900">{(calculateDays(receiptBooking.checkIn, receiptBooking.checkOut) * receiptBooking.pricePerDay).toLocaleString()} ₽</span>
+                    </div>
+
+                    {/* Expenses */}
+                    {receiptBooking.expenses && receiptBooking.expenses.map((ex, i) => (
+                        <div key={i} className="flex justify-between">
+                            <span className="text-gray-600">{ex.title}</span>
+                            <span className="font-bold text-gray-900">{ex.amount.toLocaleString()} ₽</span>
+                        </div>
+                    ))}
+
+                    {/* Legacy */}
+                    {(receiptBooking.diaperCost > 0) && (
+                        <div className="flex justify-between">
+                            <span className="text-gray-600">Памперсы</span>
+                            <span className="font-bold text-gray-900">{receiptBooking.diaperCost.toLocaleString()} ₽</span>
+                        </div>
+                    )}
+                    {(receiptBooking.damageCost > 0) && (
+                        <div className="flex justify-between">
+                            <span className="text-gray-600">Ущерб</span>
+                            <span className="font-bold text-gray-900">{receiptBooking.damageCost.toLocaleString()} ₽</span>
+                        </div>
+                    )}
+                </div>
+
+                <div className="px-6 mt-2">
+                <div className="border-t-2 border-black my-4"></div>
+                </div>
+
+                <div className="px-8 pb-4">
+                    <div className="flex justify-between items-center">
+                        <span className="font-bold text-xl uppercase text-gray-900">ИТОГО</span>
+                        <span className="font-black text-2xl text-blue-600">{calculateTotal(receiptBooking).toLocaleString()} ₽</span>
+                    </div>
+                </div>
+
+                <div className="px-8 py-8 text-center">
+                    <p className="text-gray-500 italic text-sm">Спасибо, что доверили нам {receiptBooking.dogName}!</p>
+                    <p className="text-gray-500 italic text-sm flex items-center justify-center gap-1">Ждем вас снова! <span className="text-red-500">❤</span></p>
+                </div>
+                
+                {/* Controls */}
+                <div className="no-print bg-gray-50 p-4 flex gap-3 mt-auto rounded-b-2xl">
+                <button 
+                    onClick={() => setReceiptBooking(null)} 
+                    className="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-200 rounded-lg transition-colors text-sm"
+                >
+                    Закрыть
+                </button>
+                <button 
+                    onClick={handlePrint} 
+                    className="flex-1 py-3 bg-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 text-sm shadow-lg"
+                >
+                    <Printer size={16} /> Печать
+                </button>
+                </div>
+
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
