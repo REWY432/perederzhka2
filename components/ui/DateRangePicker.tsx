@@ -226,8 +226,8 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 {date.getDate()}
               </span>
               
-              {/* Occupancy Indicator - only show for non-disabled, non-full days */}
-              {!isDisabled && status !== 'full' && (
+              {/* Occupancy Indicator - only show for non-disabled days */}
+              {!isDisabled && (
                 <div className={cn(
                   'w-1.5 h-1.5 rounded-full mt-0.5',
                   status === 'free' && 'bg-green-400',
@@ -235,8 +235,8 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 )} />
               )}
               
-              {/* Show red dot for full days that aren't disabled (edge case) */}
-              {!isPast && status === 'full' && (
+              {/* Show red dot for full days */}
+              {status === 'full' && (
                 <div className="w-1.5 h-1.5 rounded-full mt-0.5 bg-red-400" />
               )}
             </motion.button>
