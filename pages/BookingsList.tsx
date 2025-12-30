@@ -1,148 +1,224 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Filter, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Booking, BookingStatus } from '../types';
-import { calculateTotal, formatDate } from '../services/mockBackend';
-import { Search, Filter, Calendar, Edit2, Trash2 } from 'lucide-react';
+import BookingCard from '../components/BookingCard';
+import { EmptyState, BookingCardSkeleton, ConfirmDialog } from '../components/ui';
+import { cn } from '../utils/helpers';
 
-interface Props {
+type FilterType = 'all' | 'pending' | 'confirmed' | 'completed';
+
+interface BookingsListProps {
   bookings: Booking[];
-  onEdit: (b: Booking) => void;
+  onEdit: (booking: Booking) => void;
   onDelete: (id: string) => void;
   onStatusChange: (id: string, status: BookingStatus) => void;
+  isLoading?: boolean;
+  deletingId?: string | null;
 }
 
-const BookingsList: React.FC<Props> = ({ bookings, onEdit, onDelete }) => {
-  const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'CONFIRMED'>('ALL');
-  const [search, setSearch] = useState('');
+const BookingsList: React.FC<BookingsListProps> = ({
+  bookings,
+  onEdit,
+  onDelete,
+  onStatusChange,
+  isLoading = false,
+  deletingId = null
+}) => {
+  const { t } = useTranslation();
+  const [filter, setFilter] = useState<FilterType>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const filteredBookings = bookings.filter(b => {
-      const matchSearch = b.dogName.toLowerCase().includes(search.toLowerCase());
-      if (filter === 'ALL') return matchSearch;
-      if (filter === 'PENDING') return matchSearch && b.status === BookingStatus.REQUEST;
-      if (filter === 'CONFIRMED') return matchSearch && b.status === BookingStatus.CONFIRMED;
-      return matchSearch;
-  });
+  const filteredBookings = useMemo(() => {
+    let result = [...bookings];
 
-  const getStatusColor = (status: BookingStatus) => {
-      switch(status) {
-          case BookingStatus.CONFIRMED: return 'bg-green-100 text-green-700';
-          case BookingStatus.REQUEST: return 'bg-orange-100 text-orange-700';
-          case BookingStatus.CANCELLED: return 'bg-red-100 text-red-700';
-          default: return 'bg-slate-100 text-slate-700';
-      }
+    // Filter by status
+    switch (filter) {
+      case 'pending':
+        result = result.filter(b => b.status === BookingStatus.REQUEST || b.status === BookingStatus.WAITLIST);
+        break;
+      case 'confirmed':
+        result = result.filter(b => b.status === BookingStatus.CONFIRMED);
+        break;
+      case 'completed':
+        result = result.filter(b => b.status === BookingStatus.COMPLETED);
+        break;
+    }
+
+    // Filter by search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(b =>
+        b.dogName.toLowerCase().includes(query) ||
+        b.breed.toLowerCase().includes(query) ||
+        b.ownerName?.toLowerCase().includes(query)
+      );
+    }
+
+    // Sort by check-in date (newest first)
+    result.sort((a, b) => new Date(b.checkIn).getTime() - new Date(a.checkIn).getTime());
+
+    return result;
+  }, [bookings, filter, searchQuery]);
+
+  const handleDeleteConfirm = () => {
+    if (deleteConfirm) {
+      onDelete(deleteConfirm);
+      setDeleteConfirm(null);
+    }
   };
 
-  return (
-    <div className="p-6 space-y-6 animate-in fade-in duration-500 pb-24">
-      
-      {/* Header & Search */}
-      <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-serif font-bold text-slate-900">Bookings</h1>
-          <div className="flex gap-3">
-              <button className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-400 shadow-sm border border-slate-100">
-                  <Search size={20} />
-              </button>
-              <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold">
-                  S
-              </div>
-          </div>
+  const filterButtons: { key: FilterType; label: string }[] = [
+    { key: 'all', label: t('filter.all') },
+    { key: 'pending', label: t('filter.pending') },
+    { key: 'confirmed', label: t('filter.confirmed') },
+    { key: 'completed', label: t('filter.completed') }
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-4 pb-24">
+        <div className="flex justify-between items-center mb-6">
+          <div className="w-32 h-8 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+          <div className="w-10 h-10 bg-slate-200 dark:bg-slate-700 rounded-full animate-pulse" />
+        </div>
+        {[1, 2, 3].map(i => (
+          <BookingCardSkeleton key={i} />
+        ))}
       </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6 pb-24">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+          {t('nav.bookings')}
+        </h1>
+        <div className="flex gap-2">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setIsSearchOpen(!isSearchOpen)}
+            className={cn(
+              'w-10 h-10 rounded-full flex items-center justify-center transition-colors',
+              isSearchOpen
+                ? 'bg-orange-500 text-white'
+                : 'bg-white dark:bg-slate-800 text-slate-400 shadow-sm border border-slate-100 dark:border-slate-700'
+            )}
+          >
+            {isSearchOpen ? <X size={20} /> : <Search size={20} />}
+          </motion.button>
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <AnimatePresence>
+        {isSearchOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder={t('common.search')}
+                autoFocus
+                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Filter Tabs */}
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-          <button 
-            onClick={() => setFilter('ALL')}
-            className={`px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${
-                filter === 'ALL' ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'bg-white text-slate-500 border border-slate-100'
-            }`}
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-2 px-2">
+        {filterButtons.map(({ key, label }) => (
+          <motion.button
+            key={key}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setFilter(key)}
+            className={cn(
+              'px-5 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-all',
+              filter === key
+                ? 'bg-orange-500 text-white shadow-lg shadow-orange-200 dark:shadow-none'
+                : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-700 hover:border-orange-200 dark:hover:border-orange-800'
+            )}
           >
-              All Bookings
-          </button>
-          <button 
-            onClick={() => setFilter('PENDING')}
-            className={`px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${
-                filter === 'PENDING' ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'bg-white text-slate-500 border border-slate-100'
-            }`}
-          >
-              Pending
-          </button>
-          <button 
-            onClick={() => setFilter('CONFIRMED')}
-            className={`px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${
-                filter === 'CONFIRMED' ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'bg-white text-slate-500 border border-slate-100'
-            }`}
-          >
-              Confirmed
-          </button>
-          <button className="w-10 h-10 min-w-[2.5rem] bg-white rounded-full flex items-center justify-center text-slate-400 border border-slate-100">
-             <Filter size={18} />
-          </button>
+            {label}
+          </motion.button>
+        ))}
       </div>
 
-      {/* Booking Cards List */}
-      <div className="space-y-4">
-          {filteredBookings.map(booking => (
-              <div key={booking.id} className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-4">
-                  {/* Top Row: Dog Info & Status */}
-                  <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-slate-100 rounded-full overflow-hidden flex items-center justify-center">
-                             {/* Placeholder for Dog Image */}
-                             <span className="text-xl font-serif font-bold text-slate-400">{booking.dogName[0]}</span>
-                          </div>
-                          <div>
-                              <h3 className="font-bold text-lg text-slate-900 leading-tight">{booking.dogName}</h3>
-                              <p className="text-slate-500 text-sm font-medium">{booking.breed}</p>
-                          </div>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${getStatusColor(booking.status)}`}>
-                          {booking.status}
-                      </span>
-                  </div>
+      {/* Bookings List */}
+      <AnimatePresence mode="popLayout">
+        {filteredBookings.length > 0 ? (
+          <div className="space-y-4">
+            {filteredBookings.map((booking, index) => (
+              <BookingCard
+                key={booking.id}
+                booking={booking}
+                onEdit={onEdit}
+                onDelete={id => setDeleteConfirm(id)}
+                isDeleting={deletingId === booking.id}
+                index={index}
+              />
+            ))}
+          </div>
+        ) : bookings.length === 0 ? (
+          <EmptyState
+            type="noBookings"
+            className="py-20"
+          />
+        ) : (
+          <EmptyState
+            type="noResults"
+            onAction={() => {
+              setFilter('all');
+              setSearchQuery('');
+            }}
+            className="py-20"
+          />
+        )}
+      </AnimatePresence>
 
-                  {/* Middle Row: Dates */}
-                  <div className="flex items-center gap-8">
-                      <div>
-                          <p className="text-[10px] text-slate-400 uppercase font-bold mb-1 tracking-wider">Check-in</p>
-                          <div className="flex items-center gap-2 text-slate-700 font-medium">
-                              <Calendar size={16} className="text-orange-500"/>
-                              {new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </div>
-                      </div>
-                      <div>
-                          <p className="text-[10px] text-slate-400 uppercase font-bold mb-1 tracking-wider">Check-out</p>
-                          <div className="flex items-center gap-2 text-slate-700 font-medium">
-                              <Calendar size={16} className="text-orange-500"/>
-                              {new Date(booking.checkOut).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </div>
-                      </div>
-                  </div>
+      {/* Results count */}
+      {filteredBookings.length > 0 && (
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center text-sm text-slate-400"
+        >
+          {filteredBookings.length} {filteredBookings.length === 1 ? 'бронирование' : 'бронирований'}
+        </motion.p>
+      )}
 
-                  {/* Bottom Row: Price & Actions */}
-                  <div className="flex justify-between items-center pt-2 border-t border-slate-50">
-                      <div className="flex gap-2">
-                         <button onClick={() => onEdit(booking)} className="p-2 text-slate-400 hover:text-orange-500 transition-colors">
-                             <Edit2 size={18} />
-                         </button>
-                         <button onClick={() => onDelete(booking.id)} className="p-2 text-slate-400 hover:text-red-500 transition-colors">
-                             <Trash2 size={18} />
-                         </button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 bg-slate-800 rounded-full flex items-center justify-center text-white text-[10px]">
-                             $
-                          </div>
-                          <p className="text-xl font-bold text-slate-900">${calculateTotal(booking).toFixed(2)}</p>
-                      </div>
-                  </div>
-              </div>
-          ))}
-
-          {filteredBookings.length === 0 && (
-              <div className="text-center py-10 text-slate-400">
-                  <p>No bookings found matching your filters.</p>
-              </div>
-          )}
-      </div>
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        isOpen={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={handleDeleteConfirm}
+        title={t('booking.confirmDelete')}
+        description={t('booking.deleteWarning')}
+        confirmText={t('common.delete')}
+        danger
+      />
     </div>
   );
 };

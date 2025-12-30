@@ -1,240 +1,302 @@
-import React, { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { getApiUrl, setApiUrl } from './services/mockBackend';
-import { useBookings, useSaveBooking, useDeleteBooking, useSettings, useSaveSettings, useUpdateStatus } from './hooks/useDogStay';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Home, Calendar, BarChart2, Settings, Plus, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Toaster } from 'sonner';
+import { getApiUrl, setApiUrl } from './services/api';
+import {
+  useBookings,
+  useSaveBooking,
+  useDeleteBooking,
+  useSettings,
+  useSaveSettings,
+  useUpdateStatus
+} from './hooks/useDogStay';
 import { Booking, BookingStatus, AppSettings } from './types';
-import { Toaster, toast } from 'sonner';
-import { Dog, Home, Calendar, BarChart2, Settings, Plus, Loader2 } from 'lucide-react';
-import BookingForm from './components/BookingForm';
-import SettingsModal from './components/SettingsModal';
+import { cn, triggerHaptic } from './utils/helpers';
+
+// Pages
 import Dashboard from './pages/Dashboard';
 import BookingsList from './pages/BookingsList';
 import Reports from './pages/Reports';
+import SettingsPage from './pages/Settings';
 
-// --- Components ---
+// Components
+import BookingForm from './components/BookingForm';
+import Onboarding from './components/Onboarding';
 
-const Onboarding = ({ onComplete }: { onComplete: () => void }) => {
-  const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { refetch: fetchSettings } = useSettings();
+type TabType = 'home' | 'bookings' | 'reports' | 'settings';
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!url.includes('script.google.com')) {
-      toast.error('Это не похоже на ссылку Google Apps Script');
-      return;
-    }
-    setLoading(true);
-    setApiUrl(url);
-    try {
-      const res = await fetchSettings(); // Test connection
-      if (res.data) {
-        toast.success('Подключено!');
-        onComplete();
-      } else {
-         throw new Error("No settings");
-      }
-    } catch (err) {
-      toast.error('Не удалось подключиться. Проверьте ссылку.');
-      setApiUrl('');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#fafaf9] p-6">
-      <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full border border-orange-100">
-        <div className="flex justify-center mb-6">
-          <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center">
-            <Dog size={40} className="text-orange-600" />
-          </div>
-        </div>
-        <h1 className="text-3xl font-serif font-bold text-center mb-2 text-slate-900">DogStay Manager</h1>
-        <p className="text-slate-500 text-center mb-8">Введите URL вашего веб-приложения Google Apps Script для начала работы.</p>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            placeholder="https://script.google.com/..."
-            className="w-full p-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none text-slate-900 placeholder:text-slate-400"
-            value={url}
-            onChange={e => setUrl(e.target.value)}
-          />
-          <button 
-            disabled={loading}
-            className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold hover:bg-orange-700 transition disabled:opacity-50 flex justify-center items-center gap-2 shadow-lg shadow-orange-200"
-          >
-            {loading && <Loader2 className="animate-spin" size={20} />}
-            {loading ? 'Проверка...' : 'Подключить'}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// --- Main App ---
-
-export default function App() {
+const App: React.FC = () => {
+  const { t } = useTranslation();
   const [isConnected, setIsConnected] = useState(!!getApiUrl());
-  const [activeTab, setActiveTab] = useState<'home' | 'bookings' | 'reports' | 'settings'>('home');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('home');
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | undefined>();
-  
-  // Use Centralized Hooks
-  const { data: bookings = [], isLoading } = useBookings();
-  const { data: settings } = useSettings();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // React Query hooks
+  const { data: bookings = [], isLoading: bookingsLoading, refetch: refetchBookings } = useBookings();
+  const { data: settings, isLoading: settingsLoading } = useSettings();
   const saveMutation = useSaveBooking();
   const deleteMutation = useDeleteBooking();
   const updateStatusMutation = useUpdateStatus();
   const saveSettingsMutation = useSaveSettings();
 
-  const handleSave = (data: Omit<Booking, 'id' | 'createdAt'>) => {
-      const id = editingBooking?.id;
-      saveMutation.mutate({ data: data, id: id }, {
-          onSuccess: () => {
-              setIsModalOpen(false);
-              setEditingBooking(undefined);
-          }
-      });
+  // Restore active tab from session
+  useEffect(() => {
+    const saved = sessionStorage.getItem('dogstay_tab');
+    if (saved && ['home', 'bookings', 'reports', 'settings'].includes(saved)) {
+      setActiveTab(saved as TabType);
+    }
+  }, []);
+
+  // Save active tab to session
+  useEffect(() => {
+    sessionStorage.setItem('dogstay_tab', activeTab);
+  }, [activeTab]);
+
+  const handleTabChange = (tab: TabType) => {
+    triggerHaptic('light');
+    setActiveTab(tab);
   };
 
-  const handleSaveSettings = (newSettings: Partial<AppSettings>) => {
-      saveSettingsMutation.mutate(newSettings);
-  };
-
-  const handleDisconnect = () => {
-      setApiUrl('');
-      setIsConnected(false);
-  };
-
-  const handleDelete = (id: string) => {
-      if(confirm('Удалить бронирование?')) {
-          deleteMutation.mutate(id);
+  const handleSaveBooking = (data: Omit<Booking, 'id' | 'createdAt'>) => {
+    const id = editingBooking?.id;
+    saveMutation.mutate(
+      { data, id },
+      {
+        onSuccess: () => {
+          setIsFormOpen(false);
+          setEditingBooking(undefined);
+        }
       }
+    );
+  };
+
+  const handleDeleteBooking = async (id: string) => {
+    setDeletingId(id);
+    deleteMutation.mutate(id, {
+      onSettled: () => {
+        setDeletingId(null);
+      }
+    });
   };
 
   const handleStatusChange = (id: string, status: BookingStatus) => {
-     const booking = bookings.find(b => b.id === id);
-     if(booking) {
-         updateStatusMutation.mutate({ id, status, booking });
-     }
+    const booking = bookings.find(b => b.id === id);
+    if (booking) {
+      updateStatusMutation.mutate({ id, status, booking });
+    }
   };
 
+  const handleSaveSettings = (newSettings: Partial<AppSettings>) => {
+    saveSettingsMutation.mutate(newSettings);
+  };
+
+  const handleDisconnect = () => {
+    setApiUrl('');
+    setIsConnected(false);
+    setActiveTab('home');
+  };
+
+  const handleOnboardingComplete = (completedSettings: AppSettings) => {
+    setIsConnected(true);
+    refetchBookings();
+  };
+
+  const openNewBooking = () => {
+    setEditingBooking(undefined);
+    setIsFormOpen(true);
+    triggerHaptic('light');
+  };
+
+  const openEditBooking = (booking: Booking) => {
+    setEditingBooking(booking);
+    setIsFormOpen(true);
+  };
+
+  // Show onboarding if not connected
   if (!isConnected) {
     return (
       <>
-        <Toaster position="top-center" />
-        <Onboarding onComplete={() => setIsConnected(true)} />
+        <Toaster position="top-center" richColors />
+        <Onboarding onComplete={handleOnboardingComplete} />
       </>
     );
   }
 
+  const isLoading = bookingsLoading || settingsLoading;
+
+  const navItems: { key: TabType; icon: typeof Home; label: string }[] = [
+    { key: 'home', icon: Home, label: t('nav.home') },
+    { key: 'bookings', icon: Calendar, label: t('nav.bookings') },
+    { key: 'reports', icon: BarChart2, label: t('nav.reports') },
+    { key: 'settings', icon: Settings, label: t('nav.settings') }
+  ];
+
   return (
-    <div className="min-h-screen bg-[#fafaf9] text-slate-900 pb-24 md:pb-0 font-sans">
+    <div className="min-h-screen bg-[#fafaf9] dark:bg-slate-950 text-slate-900 dark:text-white pb-24 md:pb-0 font-sans">
       <Toaster position="top-center" richColors theme="light" />
-      
-      {/* Main Content Area */}
-      <main className="max-w-md mx-auto min-h-screen bg-[#fafaf9] md:max-w-5xl md:bg-white md:shadow-xl md:min-h-0 md:my-8 md:rounded-[3rem] md:overflow-hidden md:border md:border-slate-100 relative">
-        <div className="h-full overflow-y-auto custom-scrollbar md:h-[800px]">
-            {isLoading ? (
-            <div className="flex flex-col items-center justify-center h-screen md:h-full text-slate-400">
+
+      {/* Main Content */}
+      <main className="max-w-md mx-auto min-h-screen bg-[#fafaf9] dark:bg-slate-950 md:max-w-5xl md:bg-white dark:md:bg-slate-900 md:shadow-xl md:min-h-0 md:my-8 md:rounded-[3rem] md:overflow-hidden md:border md:border-slate-100 dark:md:border-slate-800 relative">
+        <div className="h-full overflow-y-auto md:h-[800px] scroll-smooth">
+          <AnimatePresence mode="wait">
+            {isLoading && activeTab !== 'settings' ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center h-screen md:h-full text-slate-400"
+              >
                 <Loader2 className="animate-spin mb-4 text-orange-500" size={40} />
-                <p>Загрузка данных...</p>
-            </div>
+                <p>{t('common.loading')}</p>
+              </motion.div>
             ) : (
-                <>
-                    {activeTab === 'home' && (
-                        <Dashboard 
-                            bookings={bookings} 
-                            maxCapacity={settings?.maxCapacity || 10}
-                            hotelName={settings?.hotelName}
-                            onNewBooking={() => { setEditingBooking(undefined); setIsModalOpen(true); }}
-                        />
-                    )}
-                    {activeTab === 'bookings' && (
-                        <BookingsList 
-                            bookings={bookings} 
-                            onEdit={(b) => { setEditingBooking(b); setIsModalOpen(true); }}
-                            onDelete={handleDelete}
-                            onStatusChange={handleStatusChange}
-                        />
-                    )}
-                    {activeTab === 'reports' && (
-                        <div className="p-6">
-                            <Reports bookings={bookings} />
-                        </div>
-                    )}
-                    {activeTab === 'settings' && settings && (
-                        <div className="p-6">
-                            <h2 className="text-3xl font-serif font-bold mb-6">Settings</h2>
-                            <SettingsModal 
-                                settings={settings}
-                                onClose={() => setActiveTab('home')}
-                                onSave={handleSaveSettings}
-                                onDisconnect={handleDisconnect}
-                                inline={true} // Render inline for mobile tab feel
-                            />
-                        </div>
-                    )}
-                </>
+              <>
+                {activeTab === 'home' && (
+                  <motion.div
+                    key="home"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                  >
+                    <Dashboard
+                      bookings={bookings}
+                      maxCapacity={settings?.maxCapacity || 10}
+                      hotelName={settings?.hotelName}
+                      onNewBooking={openNewBooking}
+                      isLoading={isLoading}
+                    />
+                  </motion.div>
+                )}
+
+                {activeTab === 'bookings' && (
+                  <motion.div
+                    key="bookings"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                  >
+                    <BookingsList
+                      bookings={bookings}
+                      onEdit={openEditBooking}
+                      onDelete={handleDeleteBooking}
+                      onStatusChange={handleStatusChange}
+                      isLoading={isLoading}
+                      deletingId={deletingId}
+                    />
+                  </motion.div>
+                )}
+
+                {activeTab === 'reports' && (
+                  <motion.div
+                    key="reports"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className="p-6"
+                  >
+                    <Reports bookings={bookings} isLoading={isLoading} />
+                  </motion.div>
+                )}
+
+                {activeTab === 'settings' && (
+                  <motion.div
+                    key="settings"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                  >
+                    <SettingsPage
+                      settings={settings || null}
+                      onSave={handleSaveSettings}
+                      onDisconnect={handleDisconnect}
+                      isLoading={settingsLoading}
+                      isSaving={saveSettingsMutation.isPending}
+                    />
+                  </motion.div>
+                )}
+              </>
             )}
+          </AnimatePresence>
         </div>
 
         {/* Bottom Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-6 py-4 flex justify-between items-center z-40 md:absolute md:w-full md:rounded-b-[3rem]">
-            <button 
-                onClick={() => setActiveTab('home')}
-                className={`flex flex-col items-center gap-1 ${activeTab === 'home' ? 'text-orange-600' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-                <Home size={24} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
-                <span className="text-[10px] font-medium">Home</span>
-            </button>
-            <button 
-                onClick={() => setActiveTab('bookings')}
-                className={`flex flex-col items-center gap-1 ${activeTab === 'bookings' ? 'text-orange-600' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-                <Calendar size={24} strokeWidth={activeTab === 'bookings' ? 2.5 : 2} />
-                <span className="text-[10px] font-medium">Bookings</span>
-            </button>
-            
-            {/* Floating FAB for Desktop/Mobile integration */}
-            <div className="relative -top-8">
-                <button 
-                    onClick={() => { setEditingBooking(undefined); setIsModalOpen(true); }}
-                    className="w-14 h-14 bg-orange-600 rounded-full shadow-lg shadow-orange-200 flex items-center justify-center text-white hover:scale-105 transition-transform"
-                >
-                    <Plus size={28} />
-                </button>
-            </div>
+        <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 px-6 py-3 flex justify-between items-center z-40 md:absolute md:w-full md:rounded-b-[3rem] safe-area-bottom">
+          {navItems.slice(0, 2).map(item => (
+            <NavButton
+              key={item.key}
+              icon={item.icon}
+              label={item.label}
+              isActive={activeTab === item.key}
+              onClick={() => handleTabChange(item.key)}
+            />
+          ))}
 
-            <button 
-                onClick={() => setActiveTab('reports')}
-                className={`flex flex-col items-center gap-1 ${activeTab === 'reports' ? 'text-orange-600' : 'text-slate-400 hover:text-slate-600'}`}
+          {/* Center FAB */}
+          <div className="relative -top-6">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={openNewBooking}
+              className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full shadow-lg shadow-orange-200 dark:shadow-none flex items-center justify-center text-white"
+              aria-label={t('dashboard.newBooking')}
             >
-                <BarChart2 size={24} strokeWidth={activeTab === 'reports' ? 2.5 : 2} />
-                <span className="text-[10px] font-medium">Reports</span>
-            </button>
-            <button 
-                onClick={() => setActiveTab('settings')}
-                className={`flex flex-col items-center gap-1 ${activeTab === 'settings' ? 'text-orange-600' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-                <Settings size={24} strokeWidth={activeTab === 'settings' ? 2.5 : 2} />
-                <span className="text-[10px] font-medium">Settings</span>
-            </button>
-        </div>
+              <Plus size={28} />
+            </motion.button>
+          </div>
+
+          {navItems.slice(2).map(item => (
+            <NavButton
+              key={item.key}
+              icon={item.icon}
+              label={item.label}
+              isActive={activeTab === item.key}
+              onClick={() => handleTabChange(item.key)}
+            />
+          ))}
+        </nav>
       </main>
 
-      {isModalOpen && (
-        <BookingForm 
-          initialData={editingBooking} 
-          allBookings={bookings}
-          maxCapacity={settings?.maxCapacity || 10}
-          onClose={() => { setIsModalOpen(false); setEditingBooking(undefined); }} 
-          onSave={handleSave}
-        />
-      )}
+      {/* Booking Form */}
+      <BookingForm
+        isOpen={isFormOpen}
+        onClose={() => {
+          setIsFormOpen(false);
+          setEditingBooking(undefined);
+        }}
+        onSave={handleSaveBooking}
+        initialData={editingBooking}
+        allBookings={bookings}
+        maxCapacity={settings?.maxCapacity || 10}
+        isLoading={saveMutation.isPending}
+      />
     </div>
   );
+};
+
+// Nav Button Component
+interface NavButtonProps {
+  icon: typeof Home;
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
 }
+
+const NavButton: React.FC<NavButtonProps> = ({ icon: Icon, label, isActive, onClick }) => (
+  <button
+    onClick={onClick}
+    className={cn(
+      'flex flex-col items-center gap-1 transition-colors py-1',
+      isActive ? 'text-orange-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+    )}
+  >
+    <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
+    <span className="text-[10px] font-medium">{label}</span>
+  </button>
+);
+
+export default App;

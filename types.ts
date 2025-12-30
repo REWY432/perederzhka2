@@ -29,26 +29,25 @@ export interface Booking {
   status: BookingStatus;
   comment?: string;
   createdAt: number;
-  
-  // Extended fields for app functionality
   expenses?: ExpenseItem[];
-  diaperCost?: number; // Legacy support
-  damageCost?: number; // Legacy support
+  diaperCost?: number;
+  damageCost?: number;
   tags?: string[];
   checklist?: string[];
   vaccineExpires?: string;
   photoUrl?: string;
+  ownerPhone?: string;
+  ownerName?: string;
 }
 
 export interface AppSettings {
   hotelName: string;
   maxCapacity: number;
-  
-  // Extended fields for app functionality
   logoUrl?: string;
   tgToken?: string;
   tgChatId?: string;
   theme?: 'light' | 'dark';
+  locale?: 'ru' | 'en';
   isLegacy?: boolean;
 }
 
@@ -59,24 +58,34 @@ export const PRICES: Record<DogSize, number> = {
 };
 
 export const AVAILABLE_TAGS = [
-  { label: 'Агрессия', color: 'bg-red-500' },
-  { label: 'Аллергия', color: 'bg-orange-500' },
-  { label: 'Прием лекарств', color: 'bg-blue-500' },
-  { label: 'Щенок', color: 'bg-green-500' },
-  { label: 'Течка', color: 'bg-pink-500' },
-  { label: 'VIP', color: 'bg-purple-500' }
+  { label: 'aggression', color: 'bg-red-500' },
+  { label: 'allergy', color: 'bg-orange-500' },
+  { label: 'medication', color: 'bg-blue-500' },
+  { label: 'puppy', color: 'bg-green-500' },
+  { label: 'heat', color: 'bg-pink-500' },
+  { label: 'vip', color: 'bg-purple-500' }
 ];
 
 export const CHECKLIST_ITEMS = [
-  'Ветпаспорт',
-  'Корм',
-  'Ошейник/Шлейка',
-  'Любимая игрушка',
-  'Лежанка (опционально)'
+  'vetPassport',
+  'food',
+  'collar',
+  'favoriteToy',
+  'bed'
 ];
 
 export interface GapMatch {
   booking: Booking;
   revenue: number;
   gapType: 'PERFECT' | 'PARTIAL';
+}
+
+export interface DogProfile {
+  name: string;
+  breed: string;
+  size: DogSize;
+  tags: string[];
+  totalVisits: number;
+  totalSpent: number;
+  lastVisit?: string;
 }
