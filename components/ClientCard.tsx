@@ -53,7 +53,7 @@ const ClientCard: React.FC<Props> = ({ dogName, allBookings, onClose }) => {
                     </h2>
                     <p className="text-gray-500 dark:text-gray-400 font-medium">{breed} • Последний визит: {lastVisit ? formatDate(lastVisit) : '-'}</p>
                     <div className="flex gap-2 mt-2">
-                        {allTags.map(t => (
+                        {allTags.map((t: string) => (
                             <span key={t} className="px-2 py-0.5 bg-white/50 dark:bg-black/30 rounded text-xs font-medium text-gray-600 dark:text-gray-300 border border-black/5 dark:border-white/10">{t}</span>
                         ))}
                     </div>
@@ -102,7 +102,7 @@ const ClientCard: React.FC<Props> = ({ dogName, allBookings, onClose }) => {
                                 </div>
                             </div>
                             
-                            {item.damageCost > 0 && (
+                            {(item.damageCost ?? 0) > 0 && (
                                 <div className="bg-red-50 text-red-600 px-3 py-1 rounded-lg text-xs font-bold border border-red-100 flex items-center gap-1">
                                     <AlertTriangle size={14} />
                                     Ущерб: {item.damageCost} ₽

@@ -1,43 +1,49 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Dog, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Dog, Check, Loader2, Calendar, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Booking, BookingStatus, DogSize, PRICES, DogProfile } from '../../types';
-import { calculateDays, cn, triggerHaptic } from '../../utils/helpers';
-import { checkAvailability } from '../../services/api';
-import { Autocomplete, DateRangePicker, BottomSheet } from '../ui';
+import { Booking, BookingStatus, DogSize, PRICES } from '../types';
+import { calculateDays } from '../services/mockBackend';
 
 interface BookingFormProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (data: Omit<Booking, 'id' | 'createdAt'>) => void;
+  isOpen?: boolean;
   initialData?: Booking;
   allBookings: Booking[];
   maxCapacity: number;
+  onClose: () => void;
+  onSave: (data: Omit<Booking, 'id' | 'createdAt'>) => void;
   isLoading?: boolean;
 }
 
-type Step = 'pet' | 'dates' | 'confirm';
+const cn = (...classes: (string | boolean | undefined)[]) => 
+  classes.filter(Boolean).join(' ');
 
-const STEPS: Step[] = ['pet', 'dates', 'confirm'];
+const triggerHaptic = (type: 'light' | 'medium' | 'heavy' = 'light') => {
+  if (navigator.vibrate) {
+    const patterns = { light: 10, medium: 20, heavy: 30 };
+    navigator.vibrate(patterns[type]);
+  }
+};
 
 const BookingForm: React.FC<BookingFormProps> = ({
-  isOpen,
-  onClose,
-  onSave,
+  isOpen = true,
   initialData,
   allBookings,
   maxCapacity,
+  onClose,
+  onSave,
   isLoading = false
 }) => {
   const { t } = useTranslation();
-  const [currentStep, setCurrentStep] = useState<Step>('pet');
+  const [step, setStep] = useState(1);
+  const totalSteps = 3;
+
   const [formData, setFormData] = useState<Omit<Booking, 'id' | 'createdAt'>>({
     dogName: '',
     breed: '',
     size: DogSize.SMALL,
-    checkIn: '',
-    checkOut: '',
+    checkIn: new Date().toISOString().split('T')[0],
+    checkOut: new Date(Date.now() + 86400000).toISOString().split('T')[0],
     pricePerDay: PRICES[DogSize.SMALL],
     expenses: [],
     diaperCost: 0,
@@ -48,389 +54,350 @@ const BookingForm: React.FC<BookingFormProps> = ({
     vaccineExpires: '',
     photoUrl: '',
     status: BookingStatus.REQUEST,
-    totalCost: 0,
-    ownerName: '',
-    ownerPhone: ''
+    totalCost: 0
   });
 
-  // Reset form when opening
   useEffect(() => {
-    if (isOpen) {
-      if (initialData) {
-        setFormData({
-          ...initialData,
-          checkIn: initialData.checkIn || '',
-          checkOut: initialData.checkOut || ''
-        });
-        setCurrentStep('pet');
-      } else {
-        setFormData({
-          dogName: '',
-          breed: '',
-          size: DogSize.SMALL,
-          checkIn: '',
-          checkOut: '',
-          pricePerDay: PRICES[DogSize.SMALL],
-          expenses: [],
-          diaperCost: 0,
-          damageCost: 0,
-          comment: '',
-          tags: [],
-          checklist: [],
-          vaccineExpires: '',
-          photoUrl: '',
-          status: BookingStatus.REQUEST,
-          totalCost: 0,
-          ownerName: '',
-          ownerPhone: ''
-        });
-        setCurrentStep('pet');
-      }
+    if (initialData) {
+      const { id, createdAt, ...rest } = initialData;
+      setFormData(rest);
     }
-  }, [isOpen, initialData]);
+  }, [initialData]);
 
-  const stepIndex = STEPS.indexOf(currentStep);
+  const days = useMemo(() => 
+    calculateDays(formData.checkIn, formData.checkOut),
+    [formData.checkIn, formData.checkOut]
+  );
+
+  const totalPrice = useMemo(() => 
+    days * formData.pricePerDay,
+    [days, formData.pricePerDay]
+  );
 
   const canGoNext = useMemo(() => {
-    switch (currentStep) {
-      case 'pet':
-        return formData.dogName.trim().length > 0;
-      case 'dates':
-        return formData.checkIn && formData.checkOut && formData.checkIn < formData.checkOut;
-      case 'confirm':
+    switch (step) {
+      case 1:
+        return formData.dogName.trim().length >= 2 && formData.breed.trim().length >= 2;
+      case 2:
+        return formData.checkIn && formData.checkOut && days > 0;
+      case 3:
         return true;
       default:
         return false;
     }
-  }, [currentStep, formData]);
-
-  const totalDays = useMemo(() => {
-    if (!formData.checkIn || !formData.checkOut) return 0;
-    return calculateDays(formData.checkIn, formData.checkOut);
-  }, [formData.checkIn, formData.checkOut]);
-
-  const totalPrice = useMemo(() => {
-    return totalDays * formData.pricePerDay;
-  }, [totalDays, formData.pricePerDay]);
-
-  const availability = useMemo(() => {
-    if (!formData.checkIn || !formData.checkOut) return { available: true, minRemaining: maxCapacity };
-    return checkAvailability(
-      formData.checkIn,
-      formData.checkOut,
-      allBookings,
-      maxCapacity,
-      initialData?.id
-    );
-  }, [formData.checkIn, formData.checkOut, allBookings, maxCapacity, initialData]);
-
-  const handleDogSelect = (profile: DogProfile) => {
-    setFormData(prev => ({
-      ...prev,
-      dogName: profile.name,
-      breed: profile.breed,
-      size: profile.size,
-      pricePerDay: PRICES[profile.size],
-      tags: profile.tags
-    }));
-    triggerHaptic('light');
-  };
+  }, [step, formData, days]);
 
   const handleNext = () => {
-    if (!canGoNext) return;
-    
-    const nextIndex = stepIndex + 1;
-    if (nextIndex < STEPS.length) {
-      setCurrentStep(STEPS[nextIndex]);
+    if (step < totalSteps && canGoNext) {
       triggerHaptic('light');
+      setStep(step + 1);
     }
   };
 
   const handleBack = () => {
-    const prevIndex = stepIndex - 1;
-    if (prevIndex >= 0) {
-      setCurrentStep(STEPS[prevIndex]);
+    if (step > 1) {
       triggerHaptic('light');
+      setStep(step - 1);
     } else {
       onClose();
     }
   };
 
   const handleSubmit = () => {
-    if (!availability.available) return;
     triggerHaptic('medium');
-    onSave({
-      ...formData,
-      totalCost: totalPrice
-    });
+    onSave({ ...formData, totalCost: totalPrice });
   };
 
-  const SizeCard = ({ size, label, desc, price }: { size: DogSize; label: string; desc: string; price: number }) => {
+  const SizeCard = ({ size, label, price }: { size: DogSize; label: string; price: number }) => {
     const isSelected = formData.size === size;
     return (
-      <motion.button
+      <button
         type="button"
-        whileTap={{ scale: 0.98 }}
         onClick={() => {
-          setFormData(prev => ({ ...prev, size, pricePerDay: price }));
           triggerHaptic('light');
+          setFormData(prev => ({ ...prev, size, pricePerDay: price }));
         }}
         className={cn(
           'flex items-center justify-between p-4 rounded-2xl border-2 transition-all w-full',
           isSelected
-            ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
-            : 'border-transparent bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700'
+            ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-900 dark:text-orange-100'
+            : 'border-transparent bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
         )}
       >
         <div className="flex items-center gap-3">
           <div className={cn(
             'w-10 h-10 rounded-full flex items-center justify-center',
-            isSelected ? 'bg-orange-200 dark:bg-orange-800 text-orange-700 dark:text-orange-200' : 'bg-white dark:bg-slate-700 text-slate-400'
+            isSelected ? 'bg-orange-200 dark:bg-orange-800 text-orange-700 dark:text-orange-300' : 'bg-white dark:bg-slate-700 text-slate-400'
           )}>
             <Dog size={size === DogSize.SMALL ? 16 : size === DogSize.MEDIUM ? 20 : 24} />
           </div>
           <div className="text-left">
-            <p className={cn('font-bold text-sm', isSelected ? 'text-orange-900 dark:text-orange-100' : 'text-slate-700 dark:text-slate-300')}>
-              {label}
+            <p className="font-bold text-sm">{label}</p>
+            <p className="text-xs opacity-70">
+              {size === DogSize.SMALL ? t('booking.upTo10kg') : size === DogSize.MEDIUM ? t('booking.upTo25kg') : t('booking.unlimited')}
             </p>
-            <p className="text-xs text-slate-500">{desc}</p>
           </div>
         </div>
-        <span className={cn('font-bold', isSelected ? 'text-orange-600' : 'text-slate-600 dark:text-slate-400')}>
-          {price.toLocaleString()} ₽
-        </span>
-      </motion.button>
+        <span className="font-bold">{price.toLocaleString()} ₽</span>
+      </button>
     );
   };
 
+  if (!isOpen) return null;
+
   return (
-    <BottomSheet isOpen={isOpen} onClose={onClose}>
-      <div className="px-6 pb-8">
-        {/* Progress Bar */}
-        <div className="flex gap-2 mb-6">
-          {STEPS.map((step, index) => (
+    <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-slate-900 animate-in slide-in-from-bottom duration-300">
+      {/* Header */}
+      <div className="px-6 py-4 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
+        <button
+          onClick={handleBack}
+          className="p-2 -ml-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full transition-colors"
+        >
+          {step === 1 ? <X size={24} /> : <ArrowLeft size={24} />}
+        </button>
+        <h2 className="text-xl font-serif font-bold text-slate-900 dark:text-white">
+          {initialData ? t('booking.edit') : t('booking.new')}
+        </h2>
+        <div className="w-10" />
+      </div>
+
+      {/* Progress Bar */}
+      <div className="px-6 pt-4">
+        <div className="flex gap-2">
+          {Array.from({ length: totalSteps }).map((_, i) => (
             <div
-              key={step}
+              key={i}
               className={cn(
-                'flex-1 h-1 rounded-full transition-colors',
-                index <= stepIndex ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
+                'h-1 flex-1 rounded-full transition-colors',
+                i < step ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
               )}
             />
           ))}
         </div>
+      </div>
 
-        {/* Step Title */}
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={handleBack}
-            className="p-2 -ml-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
-            aria-label={t('common.back')}
-          >
-            <ArrowLeft size={24} className="text-slate-600 dark:text-slate-400" />
-          </button>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-            {initialData ? t('booking.edit') : t('booking.new')}
-          </h2>
-        </div>
-
-        {/* Step Content */}
+      {/* Form Content */}
+      <div className="flex-1 overflow-y-auto px-6 py-6">
         <AnimatePresence mode="wait">
           {/* Step 1: Pet Details */}
-          {currentStep === 'pet' && (
+          {step === 1 && (
             <motion.div
-              key="pet"
+              key="step1"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
-              <div>
-                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">
-                  {t('booking.petDetails')}
-                </h3>
-                
-                <Autocomplete
-                  value={formData.dogName}
-                  onChange={val => setFormData(prev => ({ ...prev, dogName: val }))}
-                  onSelectDog={handleDogSelect}
-                  bookings={allBookings}
-                  placeholder="e.g. Buddy"
-                  label={t('booking.dogName')}
-                  icon={<Dog size={20} />}
-                  className="mb-4"
-                />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider opacity-50">
+                {t('booking.petDetails')}
+              </h3>
 
-                <div className="space-y-1 mb-4">
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 ml-1">
-                    {t('booking.breed')}
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.breed}
-                    onChange={e => setFormData(prev => ({ ...prev, breed: e.target.value }))}
-                    placeholder="Golden Retriever"
-                    className="w-full bg-slate-100 dark:bg-slate-800 rounded-2xl py-4 px-4 text-slate-900 dark:text-white font-medium placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900 transition-all"
-                  />
-                </div>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 ml-1">
+                  {t('booking.dogName')}
+                </label>
+                <input
+                  type="text"
+                  value={formData.dogName}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, dogName: e.target.value }))}
+                  placeholder="e.g. Buddy"
+                  className="w-full bg-slate-100 dark:bg-slate-800 rounded-2xl py-4 px-4 text-slate-900 dark:text-white font-medium placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900 transition-all"
+                />
               </div>
 
-              <div>
-                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">
-                  {t('booking.size')}
-                </h3>
-                <div className="space-y-3">
-                  <SizeCard size={DogSize.SMALL} label={t('booking.small')} desc={t('booking.smallDesc')} price={PRICES[DogSize.SMALL]} />
-                  <SizeCard size={DogSize.MEDIUM} label={t('booking.medium')} desc={t('booking.mediumDesc')} price={PRICES[DogSize.MEDIUM]} />
-                  <SizeCard size={DogSize.LARGE} label={t('booking.large')} desc={t('booking.largeDesc')} price={PRICES[DogSize.LARGE]} />
-                </div>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 ml-1">
+                  {t('booking.breed')}
+                </label>
+                <input
+                  type="text"
+                  value={formData.breed}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, breed: e.target.value }))}
+                  placeholder="Golden Retriever"
+                  className="w-full bg-slate-100 dark:bg-slate-800 rounded-2xl py-4 px-4 text-slate-900 dark:text-white font-medium placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900 transition-all"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider opacity-50">
+                  {t('booking.breedSize')}
+                </h4>
+                <SizeCard size={DogSize.SMALL} label={t('booking.smallBreed')} price={PRICES[DogSize.SMALL]} />
+                <SizeCard size={DogSize.MEDIUM} label={t('booking.mediumBreed')} price={PRICES[DogSize.MEDIUM]} />
+                <SizeCard size={DogSize.LARGE} label={t('booking.largeBreed')} price={PRICES[DogSize.LARGE]} />
               </div>
             </motion.div>
           )}
 
           {/* Step 2: Dates */}
-          {currentStep === 'dates' && (
+          {step === 2 && (
             <motion.div
-              key="dates"
+              key="step2"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider opacity-50">
                 {t('booking.selectDates')}
               </h3>
 
-              <DateRangePicker
-                checkIn={formData.checkIn}
-                checkOut={formData.checkOut}
-                onChangeCheckIn={date => setFormData(prev => ({ ...prev, checkIn: date }))}
-                onChangeCheckOut={date => setFormData(prev => ({ ...prev, checkOut: date }))}
-                bookings={allBookings}
-                maxCapacity={maxCapacity}
-                excludeBookingId={initialData?.id}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 ml-1">
+                    {t('booking.checkIn')}
+                  </label>
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500" size={20} />
+                    <input
+                      type="date"
+                      value={formData.checkIn}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, checkIn: e.target.value }))}
+                      className="w-full bg-slate-100 dark:bg-slate-800 rounded-2xl py-4 pl-12 pr-4 text-slate-900 dark:text-white font-medium outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900 transition-all"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 ml-1">
+                    {t('booking.checkOut')}
+                  </label>
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500" size={20} />
+                    <input
+                      type="date"
+                      value={formData.checkOut}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, checkOut: e.target.value }))}
+                      className="w-full bg-slate-100 dark:bg-slate-800 rounded-2xl py-4 pl-12 pr-4 text-slate-900 dark:text-white font-medium outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900 transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
 
-              {!availability.available && formData.checkIn && formData.checkOut && (
+              {days > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 text-red-700 dark:text-red-300 text-sm"
+                  className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-2xl"
                 >
-                  {t('validation.noCapacity')}
+                  <p className="text-orange-700 dark:text-orange-300 font-medium">
+                    {days} {t('booking.days')}
+                  </p>
                 </motion.div>
               )}
             </motion.div>
           )}
 
           {/* Step 3: Confirmation */}
-          {currentStep === 'confirm' && (
+          {step === 3 && (
             <motion.div
-              key="confirm"
+              key="step3"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">
-                {t('booking.confirmation')}
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider opacity-50">
+                {t('booking.confirm')}
               </h3>
 
               {/* Summary Card */}
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-3xl p-6 space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center">
-                    <span className="text-2xl font-bold text-orange-600">
-                      {formData.dogName[0]?.toUpperCase()}
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="text-xl font-bold text-slate-900 dark:text-white">
-                      {formData.dogName}
-                    </h4>
-                    <p className="text-slate-500">{formData.breed}</p>
-                  </div>
+              <div className="bg-orange-50 dark:bg-orange-900/20 p-6 rounded-3xl border border-orange-100 dark:border-orange-800 space-y-4">
+                <div className="flex justify-between items-center text-orange-900/60 dark:text-orange-300/60">
+                  <span>{t('booking.dogName')}</span>
+                  <span className="font-bold text-orange-900 dark:text-orange-100">{formData.dogName}</span>
                 </div>
-
-                <div className="h-px bg-slate-200 dark:bg-slate-700" />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase font-medium mb-1">{t('booking.checkIn')}</p>
-                    <p className="font-semibold text-slate-900 dark:text-white">{formData.checkIn}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase font-medium mb-1">{t('booking.checkOut')}</p>
-                    <p className="font-semibold text-slate-900 dark:text-white">{formData.checkOut}</p>
-                  </div>
+                <div className="flex justify-between items-center text-orange-900/60 dark:text-orange-300/60">
+                  <span>{t('booking.breed')}</span>
+                  <span className="font-bold text-orange-900 dark:text-orange-100">{formData.breed}</span>
                 </div>
-
-                <div className="h-px bg-slate-200 dark:bg-slate-700" />
-
-                <div className="space-y-2">
-                  <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                    <span>{t('booking.days')}</span>
-                    <span>{totalDays}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                    <span>{t('booking.pricePerDay')}</span>
-                    <span>{formData.pricePerDay.toLocaleString()} ₽</span>
-                  </div>
+                <div className="flex justify-between items-center text-orange-900/60 dark:text-orange-300/60">
+                  <span>{t('booking.days')}</span>
+                  <span>{days}</span>
                 </div>
-
-                <div className="h-px bg-slate-200 dark:bg-slate-700" />
-
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-bold text-slate-900 dark:text-white">{t('booking.totalPrice')}</span>
-                  <span className="text-2xl font-bold text-orange-600">{totalPrice.toLocaleString()} ₽</span>
+                <div className="flex justify-between items-center text-orange-900/60 dark:text-orange-300/60">
+                  <span>{t('booking.pricePerDay')}</span>
+                  <span>{formData.pricePerDay.toLocaleString()} ₽</span>
+                </div>
+                <div className="h-px bg-orange-200 dark:bg-orange-700 my-2" />
+                <div className="flex justify-between items-center text-xl font-bold text-orange-900 dark:text-orange-100">
+                  <span>{t('booking.total')}</span>
+                  <span>{totalPrice.toLocaleString()} ₽</span>
                 </div>
               </div>
 
               {/* Comment */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 ml-1">
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 ml-1">
                   {t('booking.comment')}
                 </label>
                 <textarea
                   value={formData.comment}
-                  onChange={e => setFormData(prev => ({ ...prev, comment: e.target.value }))}
-                  placeholder="..."
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, comment: e.target.value }))}
+                  placeholder={t('booking.commentPlaceholder')}
                   rows={3}
                   className="w-full bg-slate-100 dark:bg-slate-800 rounded-2xl py-4 px-4 text-slate-900 dark:text-white font-medium placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900 transition-all resize-none"
                 />
               </div>
+
+              {/* Status Selection */}
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider opacity-50">
+                  {t('booking.status')}
+                </label>
+                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                  {[BookingStatus.REQUEST, BookingStatus.CONFIRMED].map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setFormData(p => ({ ...p, status: s }))}
+                      className={cn(
+                        'flex-1 py-2 text-sm font-bold rounded-lg transition-all',
+                        formData.status === s
+                          ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white'
+                          : 'text-slate-400 dark:text-slate-500'
+                      )}
+                    >
+                      {t(`status.${s.toLowerCase()}`)}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Action Button */}
-        <motion.button
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-          onClick={currentStep === 'confirm' ? handleSubmit : handleNext}
-          disabled={!canGoNext || isLoading || (currentStep === 'confirm' && !availability.available)}
-          className={cn(
-            'w-full mt-8 py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2',
-            canGoNext && availability.available
-              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-lg'
-              : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
-          )}
-        >
-          {isLoading ? (
-            <Loader2 size={20} className="animate-spin" />
-          ) : currentStep === 'confirm' ? (
-            <>
-              <Check size={20} />
-              {initialData ? t('common.save') : t('booking.new')}
-            </>
-          ) : (
-            <>
-              {t('common.next')}
-              <ArrowRight size={20} />
-            </>
-          )}
-        </motion.button>
       </div>
-    </BottomSheet>
+
+      {/* Footer */}
+      <div className="p-6 border-t border-slate-100 dark:border-slate-800">
+        {step < totalSteps ? (
+          <button
+            onClick={handleNext}
+            disabled={!canGoNext}
+            className={cn(
+              'w-full py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2',
+              canGoNext
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100'
+                : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+            )}
+          >
+            {t('common.next')} <ArrowRight size={20} />
+          </button>
+        ) : (
+          <button
+            onClick={handleSubmit}
+            disabled={isLoading}
+            className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-orange-200 dark:shadow-none flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {isLoading ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : (
+              <Check size={20} />
+            )}
+            {initialData ? t('common.save') : t('booking.create')}
+          </button>
+        )}
+      </div>
+    </div>
   );
 };
 

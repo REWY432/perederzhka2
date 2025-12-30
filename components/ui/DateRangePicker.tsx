@@ -1,9 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Booking, BookingStatus } from '../../types';
-import { cn } from '../../utils/helpers';
 
 interface DateRangePickerProps {
   checkIn: string;
@@ -13,11 +12,10 @@ interface DateRangePickerProps {
   bookings: Booking[];
   maxCapacity: number;
   excludeBookingId?: string;
-  className?: string;
 }
 
-const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-const WEEKDAYS_EN = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const cn = (...classes: (string | boolean | undefined)[]) => 
+  classes.filter(Boolean).join(' ');
 
 const DateRangePicker: React.FC<DateRangePickerProps> = ({
   checkIn,
@@ -26,162 +24,160 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   onChangeCheckOut,
   bookings,
   maxCapacity,
-  excludeBookingId,
-  className
+  excludeBookingId
 }) => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [currentMonth, setCurrentMonth] = useState(() => {
-    const date = checkIn ? new Date(checkIn) : new Date();
-    return new Date(date.getFullYear(), date.getMonth(), 1);
+    const d = checkIn ? new Date(checkIn) : new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
   });
   const [selecting, setSelecting] = useState<'checkIn' | 'checkOut'>('checkIn');
 
-  const weekdays = i18n.language === 'ru' ? WEEKDAYS : WEEKDAYS_EN;
+  const today = new Date().toISOString().split('T')[0];
 
-  // Calculate occupancy for the displayed month
+  // Calculate occupancy map for current month view
   const occupancyMap = useMemo(() => {
-    const map = new Map<string, number>();
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const map: Record<string, number> = {};
+    const activeBookings = bookings.filter(b => 
+      b.status === BookingStatus.CONFIRMED || 
+      b.status === BookingStatus.REQUEST
+    ).filter(b => b.id !== excludeBookingId);
 
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
-      const dateStr = date.toISOString().split('T')[0];
-      
-      const occupancy = bookings.filter(b => {
-        if (b.id === excludeBookingId) return false;
-        if (b.status === BookingStatus.CANCELLED) return false;
-        return dateStr >= b.checkIn && dateStr <= b.checkOut;
-      }).length;
+    // Check dates for current month ± 1 month
+    const startDate = new Date(currentMonth);
+    startDate.setMonth(startDate.getMonth() - 1);
+    const endDate = new Date(currentMonth);
+    endDate.setMonth(endDate.getMonth() + 2);
 
-      map.set(dateStr, occupancy);
-    }
+    activeBookings.forEach(b => {
+      const bookingStart = new Date(b.checkIn);
+      const bookingEnd = new Date(b.checkOut);
+
+      for (let d = new Date(bookingStart); d <= bookingEnd; d.setDate(d.getDate() + 1)) {
+        if (d >= startDate && d <= endDate) {
+          const key = d.toISOString().split('T')[0];
+          map[key] = (map[key] || 0) + 1;
+        }
+      }
+    });
 
     return map;
   }, [bookings, currentMonth, excludeBookingId]);
 
   const getDayStatus = (dateStr: string): 'free' | 'busy' | 'full' => {
-    const occupancy = occupancyMap.get(dateStr) || 0;
-    if (occupancy >= maxCapacity) return 'full';
-    if (occupancy >= maxCapacity * 0.7) return 'busy';
+    const count = occupancyMap[dateStr] || 0;
+    if (count >= maxCapacity) return 'full';
+    if (count >= maxCapacity * 0.7) return 'busy';
     return 'free';
+  };
+
+  const handleDayClick = (dateStr: string) => {
+    if (selecting === 'checkIn') {
+      onChangeCheckIn(dateStr);
+      if (!checkOut || dateStr >= checkOut) {
+        // Auto-set checkout to next day
+        const nextDay = new Date(dateStr);
+        nextDay.setDate(nextDay.getDate() + 1);
+        onChangeCheckOut(nextDay.toISOString().split('T')[0]);
+      }
+      setSelecting('checkOut');
+    } else {
+      if (dateStr > checkIn) {
+        onChangeCheckOut(dateStr);
+        setSelecting('checkIn');
+      } else {
+        // If selected date is before checkIn, swap
+        onChangeCheckIn(dateStr);
+        setSelecting('checkOut');
+      }
+    }
   };
 
   const isInRange = (dateStr: string) => {
     if (!checkIn || !checkOut) return false;
-    return dateStr >= checkIn && dateStr <= checkOut;
+    return dateStr > checkIn && dateStr < checkOut;
   };
 
   const isRangeStart = (dateStr: string) => dateStr === checkIn;
   const isRangeEnd = (dateStr: string) => dateStr === checkOut;
 
-  const handleDayClick = (dateStr: string) => {
-    const status = getDayStatus(dateStr);
-    if (status === 'full') return;
-
-    if (selecting === 'checkIn') {
-      onChangeCheckIn(dateStr);
-      if (checkOut && dateStr > checkOut) {
-        onChangeCheckOut('');
-      }
-      setSelecting('checkOut');
-    } else {
-      if (dateStr < checkIn) {
-        onChangeCheckIn(dateStr);
-        onChangeCheckOut('');
-      } else {
-        onChangeCheckOut(dateStr);
-        setSelecting('checkIn');
-      }
-    }
-  };
-
-  const prevMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
-  };
-
-  const nextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
-  };
-
   // Generate calendar days
   const calendarDays = useMemo(() => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const firstDayOfMonth = new Date(year, month, 1).getDay();
-    const startOffset = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
-
+    
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    // Get day of week for first day (0 = Sunday, adjust for Monday start)
+    let startDayOfWeek = firstDay.getDay();
+    startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+    
     const days: Array<{ date: Date; dateStr: string } | null> = [];
-
-    // Empty slots for start
-    for (let i = 0; i < startOffset; i++) {
+    
+    // Add empty slots for days before month starts
+    for (let i = 0; i < startDayOfWeek; i++) {
       days.push(null);
     }
-
-    // Actual days
-    for (let day = 1; day <= daysInMonth; day++) {
+    
+    // Add days of month
+    for (let day = 1; day <= lastDay.getDate(); day++) {
       const date = new Date(year, month, day);
       days.push({
         date,
         dateStr: date.toISOString().split('T')[0]
       });
     }
-
+    
     return days;
   }, [currentMonth]);
 
-  const today = new Date().toISOString().split('T')[0];
+  const prevMonth = () => {
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const nextMonth = () => {
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
   return (
-    <div className={cn('bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800', className)}>
-      {/* Legend */}
-      <div className="flex gap-4 mb-4 text-xs">
-        <span className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-green-400" />
-          <span className="text-slate-600 dark:text-slate-400">{t('calendar.free')}</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-amber-400" />
-          <span className="text-slate-600 dark:text-slate-400">{t('calendar.busy')}</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-red-400" />
-          <span className="text-slate-600 dark:text-slate-400">{t('calendar.full')}</span>
-        </span>
-      </div>
-
+    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800">
       {/* Month Navigation */}
-      <div className="flex items-center justify-between mb-4">
-        <button
+      <div className="flex items-center justify-between mb-6">
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
           onClick={prevMonth}
-          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-          aria-label={t('a11y.previousMonth')}
+          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+          aria-label={t('calendar.prevMonth')}
         >
           <ChevronLeft size={20} className="text-slate-600 dark:text-slate-400" />
-        </button>
+        </motion.button>
         
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white capitalize">
-          {currentMonth.toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : 'en-US', {
-            month: 'long',
-            year: 'numeric'
-          })}
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white capitalize">
+          {currentMonth.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}
         </h3>
         
-        <button
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
           onClick={nextMonth}
-          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-          aria-label={t('a11y.nextMonth')}
+          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+          aria-label={t('calendar.nextMonth')}
         >
           <ChevronRight size={20} className="text-slate-600 dark:text-slate-400" />
-        </button>
+        </motion.button>
       </div>
 
-      {/* Weekdays Header */}
+      {/* Weekday Headers */}
       <div className="grid grid-cols-7 gap-1 mb-2">
-        {weekdays.map(day => (
-          <div key={day} className="text-center text-xs font-medium text-slate-400 py-2">
+        {weekDays.map(day => (
+          <div
+            key={day}
+            className="text-center text-xs font-medium text-slate-400 dark:text-slate-500 py-2"
+          >
             {day}
           </div>
         ))}
@@ -218,25 +214,30 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 (isStart || isEnd) && 'bg-orange-500 text-white',
                 isToday && !isStart && !isEnd && 'ring-2 ring-orange-500 ring-inset'
               )}
-              aria-label={`${t('a11y.selectDate')}: ${dateStr}`}
-              aria-pressed={isStart || isEnd}
+              aria-label={`${date.getDate()} ${currentMonth.toLocaleString('ru-RU', { month: 'long' })}`}
+              aria-selected={isStart || isEnd}
             >
               <span className={cn(
                 'text-sm font-medium',
-                (isStart || isEnd) ? 'text-white' : 'text-slate-900 dark:text-white',
-                isDisabled && 'text-slate-300 dark:text-slate-600'
+                (isStart || isEnd) && 'text-white',
+                !isStart && !isEnd && !isDisabled && 'text-slate-700 dark:text-slate-300',
+                isDisabled && 'text-slate-400 dark:text-slate-600'
               )}>
                 {date.getDate()}
               </span>
               
-              {/* Occupancy Indicator */}
-              {!isDisabled && (
+              {/* Occupancy Indicator - only show for non-disabled, non-full days */}
+              {!isDisabled && status !== 'full' && (
                 <div className={cn(
                   'w-1.5 h-1.5 rounded-full mt-0.5',
                   status === 'free' && 'bg-green-400',
-                  status === 'busy' && 'bg-amber-400',
-                  status === 'full' && 'bg-red-400'
+                  status === 'busy' && 'bg-amber-400'
                 )} />
+              )}
+              
+              {/* Show red dot for full days that aren't disabled (edge case) */}
+              {!isPast && status === 'full' && (
+                <div className="w-1.5 h-1.5 rounded-full mt-0.5 bg-red-400" />
               )}
             </motion.button>
           );
@@ -248,32 +249,48 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
         <button
           onClick={() => setSelecting('checkIn')}
           className={cn(
-            'flex-1 p-3 rounded-xl border-2 transition-colors text-left',
+            'flex-1 p-3 rounded-xl border-2 transition-all',
             selecting === 'checkIn'
               ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
               : 'border-slate-200 dark:border-slate-700'
           )}
         >
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t('booking.checkIn')}</p>
-          <p className="font-semibold text-slate-900 dark:text-white">
-            {checkIn || '—'}
+          <p className="font-bold text-slate-900 dark:text-white">
+            {checkIn ? new Date(checkIn).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '—'}
           </p>
         </button>
         
         <button
           onClick={() => setSelecting('checkOut')}
           className={cn(
-            'flex-1 p-3 rounded-xl border-2 transition-colors text-left',
+            'flex-1 p-3 rounded-xl border-2 transition-all',
             selecting === 'checkOut'
               ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
               : 'border-slate-200 dark:border-slate-700'
           )}
         >
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t('booking.checkOut')}</p>
-          <p className="font-semibold text-slate-900 dark:text-white">
-            {checkOut || '—'}
+          <p className="font-bold text-slate-900 dark:text-white">
+            {checkOut ? new Date(checkOut).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '—'}
           </p>
         </button>
+      </div>
+
+      {/* Legend */}
+      <div className="mt-4 flex items-center justify-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full bg-green-400" />
+          <span>{t('calendar.free')}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full bg-amber-400" />
+          <span>{t('calendar.busy')}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full bg-red-400" />
+          <span>{t('calendar.full')}</span>
+        </div>
       </div>
     </div>
   );
