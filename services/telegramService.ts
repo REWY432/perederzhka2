@@ -1,19 +1,5 @@
-const TG_TOKEN_KEY = 'dogstay_tg_token';
-const TG_CHAT_ID_KEY = 'dogstay_tg_chat_id';
 
-export const getTelegramSettings = () => ({
-  token: localStorage.getItem(TG_TOKEN_KEY) || '',
-  chatId: localStorage.getItem(TG_CHAT_ID_KEY) || ''
-});
-
-export const saveTelegramSettings = (token: string, chatId: string) => {
-  localStorage.setItem(TG_TOKEN_KEY, token);
-  localStorage.setItem(TG_CHAT_ID_KEY, chatId);
-};
-
-export const sendTelegramMessage = async (message: string) => {
-  const { token, chatId } = getTelegramSettings();
-  
+export const sendTelegramMessage = async (message: string, token?: string, chatId?: string) => {
   if (!token || !chatId) {
     console.warn("Telegram credentials missing");
     return false;

@@ -3,76 +3,53 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#0f172a" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>DogStay - Управление передержкой</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/616/616408.png">
-    <style>
-      body {
-        font-family: 'Inter', sans-serif;
-        background: fixed;
-        background-color: #4158D0;
-        background-image: linear-gradient(43deg, #4158D0 0%, #C850C0 46%, #FFCC70 100%);
-        min-height: 100vh;
-        overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
-      }
-      
-      /* Liquid background animation effect */
-      body::before {
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: 
-          radial-gradient(circle at 15% 50%, rgba(255, 255, 255, 0.4), transparent 25%),
-          radial-gradient(circle at 85% 30%, rgba(63, 221, 230, 0.4), transparent 25%);
-        filter: blur(40px);
-        z-index: -1;
-        pointer-events: none;
-      }
-
-      /* Custom scrollbar for glass feel */
-      ::-webkit-scrollbar {
-        width: 4px;
-        height: 4px;
-      }
-      ::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.1); 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.4); 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.6); 
-      }
-    </style>
+    <title>DogStay Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
-<script type="importmap">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: { 
+              sans: ['Inter', 'sans-serif'],
+              serif: ['Playfair Display', 'serif']
+            },
+            colors: {
+              primary: "#ea580c", 
+              secondary: "#f1f5f9",
+              surface: "#ffffff",
+              background: "#fafaf9" 
+            },
+            borderRadius: {
+              'xl': '1rem',
+              '2xl': '1.5rem',
+              '3xl': '2rem',
+            }
+          },
+        },
+      }
+    </script>
+    <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@tanstack/react-query": "https://esm.sh/@tanstack/react-query@^5.90.16",
     "react/": "https://esm.sh/react@^19.2.3/",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.11.0",
+    "sonner": "https://esm.sh/sonner@^2.0.7",
     "recharts": "https://esm.sh/recharts@^3.6.0",
     "vite": "https://esm.sh/vite@^7.3.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "vite-plugin-pwa": "https://esm.sh/vite-plugin-pwa@^1.2.0",
-    "react-dom": "https://esm.sh/react-dom@^19.2.3"
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body>
+  <body class="bg-[#fafaf9] text-slate-900 dark:bg-slate-950 dark:text-slate-50 antialiased selection:bg-orange-100 selection:text-orange-900">
     <div id="root"></div>
-    <script type="module" src="./index.tsx"></script>
+    <script type="module" src="/src/index.tsx"></script>
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>

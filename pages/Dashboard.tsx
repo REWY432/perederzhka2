@@ -1,211 +1,174 @@
-
-import React, { useMemo, useState } from 'react';
-import { Booking, BookingStatus, GapMatch } from '../types';
-import { calculateTotal, formatDate } from '../services/mockBackend';
-import { findGapMatches } from '../services/tetrisService';
-import { DollarSign, Home, CalendarDays, TrendingUp, Hourglass, Sparkles, X, ArrowRight } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Booking, BookingStatus } from '../types';
+import { calculateTotal } from '../services/mockBackend';
+import { Plus, Bell, Calendar as CalendarIcon, Dog, BarChart3, ArrowUpRight } from 'lucide-react';
+import { BarChart, Bar, ResponsiveContainer, Cell } from 'recharts';
 
 interface Props {
   bookings: Booking[];
   maxCapacity: number;
-  onStatusChange: (id: string, status: BookingStatus) => void;
+  hotelName?: string;
+  onNewBooking: () => void;
 }
 
-const StatCard = ({ title, value, icon: Icon, color, subtext, onClick, className }: any) => (
-  <div 
-    onClick={onClick}
-    className={`relative overflow-hidden bg-white/40 dark:bg-black/40 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-3xl p-6 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] group transition-transform hover:-translate-y-1 ${onClick ? 'cursor-pointer hover:border-white/80' : ''} ${className}`}
-  >
-    <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-20 ${color} blur-xl group-hover:scale-150 transition-transform duration-500`}></div>
-    <div className="flex items-start justify-between relative z-10">
-      <div>
-        <p className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-1">{title}</p>
-        <h3 className="text-3xl font-bold text-gray-800 dark:text-white">{value}</h3>
-        {subtext && <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 font-medium">{subtext}</p>}
-      </div>
-      <div className={`p-3 rounded-2xl ${color} text-white shadow-lg bg-opacity-80 backdrop-blur-md`}>
-        <Icon size={24} />
-      </div>
-    </div>
-  </div>
-);
-
-const getStatusLabel = (status: BookingStatus) => {
-  switch (status) {
-    case BookingStatus.REQUEST: return 'Заявка';
-    case BookingStatus.CONFIRMED: return 'Подтверждено';
-    case BookingStatus.COMPLETED: return 'Завершено';
-    case BookingStatus.CANCELLED: return 'Отмена';
-    case BookingStatus.WAITLIST: return 'Ожидание';
-    default: return status;
-  }
-};
-
-const Dashboard: React.FC<Props> = ({ bookings, maxCapacity, onStatusChange }) => {
-  const today = new Date();
-  const currentMonth = today.getMonth();
-  const nextMonth = (currentMonth + 1) % 12;
-
-  // Tetris Logic: Find matches
-  const gapMatches = useMemo(() => findGapMatches(bookings, maxCapacity), [bookings, maxCapacity]);
-  const [showTetrisModal, setShowTetrisModal] = useState(false);
-
-  const activeBookings = bookings.filter(b => {
-    const start = new Date(b.checkIn);
-    const end = new Date(b.checkOut);
-    return today >= start && today <= end && (b.status === BookingStatus.CONFIRMED || b.status === BookingStatus.REQUEST);
-  });
-
-  const activeDogs = activeBookings.length;
-
-  const thisMonthRevenue = bookings
-    .filter(b => {
-      const checkIn = new Date(b.checkIn);
-      return checkIn.getMonth() === currentMonth && (b.status === BookingStatus.CONFIRMED || b.status === BookingStatus.COMPLETED);
-    })
-    .reduce((sum, b) => sum + calculateTotal(b), 0);
-
-  const nextMonthBookings = bookings.filter(b => {
-     const checkIn = new Date(b.checkIn);
-     return checkIn.getMonth() === nextMonth && b.status !== BookingStatus.CANCELLED;
+const Dashboard: React.FC<Props> = ({ bookings, maxCapacity, hotelName, onNewBooking }) => {
+  const activeBookings = bookings.filter(b => b.status !== BookingStatus.CANCELLED && b.status !== BookingStatus.COMPLETED);
+  const currentDogs = activeBookings.length;
+  const nextMonthCount = bookings.filter(b => {
+      const d = new Date(b.checkIn);
+      const nextMonth = new Date();
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      return d.getMonth() === nextMonth.getMonth();
   }).length;
+  
+  const currentRevenue = bookings.reduce((sum, b) => sum + (b.status === BookingStatus.CONFIRMED ? calculateTotal(b) : 0), 0);
 
-  const pendingRequests = bookings.filter(b => b.status === BookingStatus.REQUEST).length;
-  const waitlistCount = bookings.filter(b => b.status === BookingStatus.WAITLIST).length;
+  // Simple data for bar chart visualization
+  const chartData = [
+      { name: '1', val: 400 }, { name: '2', val: 300 }, { name: '3', val: 550 }, 
+      { name: '4', val: 450 }, { name: '5', val: 600 }, { name: '6', val: 750 }
+  ];
 
-  const handleAcceptMatch = (match: GapMatch) => {
-      onStatusChange(match.booking.id, BookingStatus.CONFIRMED);
+  // Calendar Logic
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const calendarDays = Array.from({length: daysInMonth}, (_, i) => i + 1);
+  const startDayOffset = new Date(today.getFullYear(), today.getMonth(), 1).getDay() - 1; // Mon start
+
+  const getDayStatus = (day: number) => {
+     const date = new Date(today.getFullYear(), today.getMonth(), day);
+     const count = bookings.filter(b => {
+         const s = new Date(b.checkIn);
+         const e = new Date(b.checkOut);
+         return date >= s && date <= e && b.status === BookingStatus.CONFIRMED;
+     }).length;
+     
+     if (count === 0) return 'empty';
+     if (count >= maxCapacity) return 'full';
+     return 'partial';
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-end">
-        <div>
-           <h2 className="text-3xl font-bold text-white drop-shadow-md">Обзор</h2>
-           <p className="text-white/80 font-medium">Добро пожаловать. Вот ситуация в гостинице на сегодня.</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-        <StatCard title="Сейчас живут" value={`${activeDogs} / ${maxCapacity}`} icon={Home} color={activeDogs >= maxCapacity ? "bg-red-500" : "bg-blue-500"} subtext="Собак на передержке" />
-        
-        {/* Tetris Widget - Only show if matches found */}
-        {gapMatches.length > 0 ? (
-           <StatCard 
-              title="Умный Тетрис" 
-              value={gapMatches.length} 
-              icon={Sparkles} 
-              color="bg-gradient-to-r from-violet-500 to-fuchsia-500" 
-              subtext={`Возможность: +${gapMatches.reduce((s, m) => s + m.revenue, 0).toLocaleString()} ₽`}
-              onClick={() => setShowTetrisModal(true)}
-              className="ring-2 ring-violet-400/50 hover:ring-violet-400 cursor-pointer"
-           />
-        ) : (
-           <StatCard title="Выручка (Месяц)" value={`${thisMonthRevenue.toLocaleString()} ₽`} icon={DollarSign} color="bg-teal-500" subtext="Фактическая" />
-        )}
-
-        <StatCard title="Лист ожидания" value={waitlistCount} icon={Hourglass} color="bg-indigo-500" subtext="Потенциальные гости" />
-        <StatCard title="След. месяц" value={nextMonthBookings} icon={CalendarDays} color="bg-purple-500" subtext="Все записи" />
-        <StatCard title="Новые заявки" value={pendingRequests} icon={TrendingUp} color="bg-amber-500" subtext="Требуют внимания" />
-      </div>
-
-      <div className="bg-white/40 dark:bg-black/40 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-3xl shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] overflow-hidden">
-        <div className="p-6 border-b border-white/20 bg-white/20 dark:bg-black/10">
-          <h3 className="font-bold text-gray-800 dark:text-gray-100 text-lg">Последняя активность</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-700 dark:text-gray-200">
-            <thead className="bg-white/30 dark:bg-black/20 text-gray-600 dark:text-gray-400 font-semibold uppercase text-xs tracking-wider">
-              <tr>
-                <th className="p-5">Собака</th>
-                <th className="p-5">Даты</th>
-                <th className="p-5">Статус</th>
-                <th className="p-5 text-right">Сумма</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/20">
-              {bookings.sort((a,b) => b.createdAt - a.createdAt).slice(0, 5).map(booking => (
-                <tr key={booking.id} className="hover:bg-white/30 dark:hover:bg-white/5 transition-colors">
-                  <td className="p-5 font-bold text-gray-900 dark:text-gray-100">{booking.dogName} <span className="text-gray-500 dark:text-gray-400 font-normal ml-1">({booking.breed})</span></td>
-                  <td className="p-5 font-medium text-gray-600 dark:text-gray-300">{formatDate(booking.checkIn)} — {formatDate(booking.checkOut)}</td>
-                  <td className="p-5">
-                    <span className={`px-3 py-1 rounded-lg text-xs font-bold shadow-sm backdrop-blur-md ${
-                      booking.status === BookingStatus.CONFIRMED ? 'bg-green-100/60 dark:bg-green-900/40 text-green-700 dark:text-green-200 border border-green-200 dark:border-green-800' :
-                      booking.status === BookingStatus.REQUEST ? 'bg-amber-100/60 dark:bg-amber-900/40 text-amber-700 dark:text-amber-200 border border-amber-200 dark:border-amber-800' :
-                      booking.status === BookingStatus.WAITLIST ? 'bg-indigo-100/60 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800' :
-                      booking.status === BookingStatus.CANCELLED ? 'bg-red-100/60 dark:bg-red-900/40 text-red-700 dark:text-red-200 border border-red-200 dark:border-red-800' :
-                      'bg-gray-100/60 dark:bg-gray-700/40 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600'
-                    }`}>
-                      {getStatusLabel(booking.status)}
-                    </span>
-                  </td>
-                  <td className="p-5 text-right font-bold text-gray-800 dark:text-gray-100">{calculateTotal(booking).toLocaleString()} ₽</td>
-                </tr>
-              ))}
-              {bookings.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-gray-500 dark:text-gray-400 font-medium">Бронирований нет. Создайте первую запись.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Tetris Modal */}
-      {showTetrisModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowTetrisModal(false)}></div>
-              <div className="relative bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-white/20">
-                  <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 p-6 text-white relative">
-                      <button onClick={() => setShowTetrisModal(false)} className="absolute right-4 top-4 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors">
-                          <X size={20} />
-                      </button>
-                      <div className="flex items-center gap-3 mb-2">
-                          <div className="p-2 bg-white/20 rounded-lg">
-                              <Sparkles size={24} />
-                          </div>
-                          <h2 className="text-2xl font-bold">Умный Тетрис</h2>
-                      </div>
-                      <p className="opacity-90">Мы нашли {gapMatches.length} заявки из листа ожидания, которые идеально вписываются в ваш график ("окна") без овербукинга.</p>
-                  </div>
-
-                  <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4 bg-gray-50 dark:bg-black/20">
-                      {gapMatches.map(match => (
-                          <div key={match.booking.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
-                              <div className="flex items-center gap-4 w-full sm:w-auto">
-                                  <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-bold text-xl">
-                                      {match.booking.dogName[0]}
-                                  </div>
-                                  <div>
-                                      <h3 className="font-bold text-gray-900 dark:text-white text-lg">{match.booking.dogName}</h3>
-                                      <p className="text-sm text-gray-500 dark:text-gray-400">{match.booking.breed}</p>
-                                      <div className="flex gap-2 mt-1 text-xs font-medium text-gray-600 dark:text-gray-300">
-                                          <span className="bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
-                                              {formatDate(match.booking.checkIn)} — {formatDate(match.booking.checkOut)}
-                                          </span>
-                                      </div>
-                                  </div>
-                              </div>
-                              
-                              <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-                                  <div className="text-right">
-                                      <p className="text-emerald-600 dark:text-emerald-400 font-bold text-lg">+{match.revenue.toLocaleString()} ₽</p>
-                                      <p className="text-xs text-gray-400">Выручка</p>
-                                  </div>
-                                  <button 
-                                      onClick={() => handleAcceptMatch(match)}
-                                      className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-bold transition-colors flex items-center gap-2 shadow-lg shadow-violet-500/30"
-                                  >
-                                      Заселить <ArrowRight size={16} />
-                                  </button>
-                              </div>
-                          </div>
-                      ))}
-                  </div>
+    <div className="p-6 space-y-8 animate-in fade-in duration-500">
+      
+      {/* Header */}
+      <div className="flex justify-between items-start">
+          <div>
+              <p className="text-slate-500 text-sm mb-1">Welcome back,</p>
+              <h1 className="text-3xl font-serif font-bold text-slate-900">{hotelName || 'My Hotel'}</h1>
+          </div>
+          <div className="flex items-center gap-4">
+              <button className="p-2 bg-white rounded-full shadow-sm text-slate-400 hover:text-orange-500 transition-colors">
+                  <Bell size={24} />
+              </button>
+              <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                  S
               </div>
           </div>
-      )}
+      </div>
+
+      {/* Hero Action */}
+      <button 
+        onClick={onNewBooking}
+        className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white p-5 rounded-3xl shadow-xl shadow-orange-200 flex items-center justify-between group transition-transform hover:scale-[1.02]"
+      >
+          <span className="font-bold text-lg">New Booking</span>
+          <div className="bg-white/20 p-2 rounded-full">
+              <Plus size={24} className="text-white" />
+          </div>
+      </button>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between h-40">
+               <div className="flex justify-between items-start">
+                   <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
+                       <Dog size={20} />
+                   </div>
+                   <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                       <ArrowUpRight size={10} /> +2
+                   </span>
+               </div>
+               <div>
+                   <p className="text-slate-500 text-sm">Current Dogs</p>
+                   <p className="text-3xl font-bold text-slate-900">{currentDogs}</p>
+               </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between h-40">
+               <div className="flex justify-between items-start">
+                   <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                       <CalendarIcon size={20} />
+                   </div>
+                   <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                       <ArrowUpRight size={10} /> 12%
+                   </span>
+               </div>
+               <div>
+                   <p className="text-slate-500 text-sm">Next Month</p>
+                   <p className="text-3xl font-bold text-slate-900">{nextMonthCount}</p>
+               </div>
+          </div>
+      </div>
+
+      {/* Revenue Card */}
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+          <div className="flex justify-between items-end mb-4">
+              <div>
+                  <p className="text-slate-500 text-sm mb-1">Revenue (Oct)</p>
+                  <h3 className="text-3xl font-serif font-bold text-slate-900">${currentRevenue.toLocaleString()}</h3>
+              </div>
+              <div className="mb-2">
+                   <BarChart3 className="text-orange-500" size={24} />
+              </div>
+          </div>
+          <div className="h-16 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                      <Bar dataKey="val" radius={[4, 4, 4, 4]}>
+                        {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#fb923c' : '#fdba74'} />
+                        ))}
+                      </Bar>
+                  </BarChart>
+              </ResponsiveContainer>
+          </div>
+      </div>
+
+      {/* Occupancy Calendar Widget */}
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 pb-8">
+          <div className="flex justify-between items-center mb-6">
+              <h3 className="font-serif font-bold text-lg">Occupancy</h3>
+              <div className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold text-slate-600">
+                  {today.toLocaleString('en-US', { month: 'long', year: 'numeric' })}
+              </div>
+          </div>
+          
+          <div className="grid grid-cols-7 gap-y-6 text-center">
+              {['Mo','Tu','We','Th','Fr','Sa','Su'].map(d => (
+                  <span key={d} className="text-xs text-slate-400 font-medium">{d}</span>
+              ))}
+              
+              {/* Empty slots for start of month */}
+              {Array.from({length: startDayOffset > 0 ? startDayOffset : 0}).map((_, i) => <div key={`empty-${i}`} />)}
+
+              {calendarDays.map(day => {
+                  const status = getDayStatus(day);
+                  const isToday = day === today.getDate();
+                  
+                  return (
+                      <div key={day} className="flex flex-col items-center gap-1">
+                          <span className={`text-sm font-medium ${isToday ? 'text-orange-600 font-bold' : 'text-slate-700'}`}>
+                              {day}
+                          </span>
+                          {status === 'full' && <div className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+                          {status === 'partial' && <div className="w-1.5 h-1.5 rounded-full bg-orange-400" />}
+                          {status === 'empty' && <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />}
+                      </div>
+                  )
+              })}
+          </div>
+      </div>
 
     </div>
   );
