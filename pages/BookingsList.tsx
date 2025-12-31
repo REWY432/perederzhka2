@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Booking, BookingStatus } from '../types';
+import { Booking, BookingStatus, AppSettings } from '../types';
 import BookingCard from '../components/BookingCard';
 import { EmptyState, BookingCardSkeleton, ConfirmDialog } from '../components/ui';
 import { cn } from '../utils/helpers';
@@ -11,6 +11,7 @@ type FilterType = 'all' | 'pending' | 'confirmed' | 'completed';
 
 interface BookingsListProps {
   bookings: Booking[];
+  settings?: AppSettings;
   onEdit: (booking: Booking) => void;
   onDelete: (id: string) => void;
   onStatusChange: (id: string, status: BookingStatus) => void;
@@ -20,6 +21,7 @@ interface BookingsListProps {
 
 const BookingsList: React.FC<BookingsListProps> = ({
   bookings,
+  settings,
   onEdit,
   onDelete,
   onStatusChange,
@@ -174,6 +176,7 @@ const BookingsList: React.FC<BookingsListProps> = ({
               <BookingCard
                 key={booking.id}
                 booking={booking}
+                settings={settings}
                 onEdit={onEdit}
                 onDelete={id => setDeleteConfirm(id)}
                 isDeleting={deletingId === booking.id}
