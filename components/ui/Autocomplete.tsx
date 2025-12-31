@@ -35,7 +35,7 @@ const Autocomplete: React.FC<AutocompleteProps> = ({
     const profiles = new Map<string, DogProfile>();
     
     bookings.forEach(b => {
-      const key = b.dogName.toLowerCase().trim();
+      const key = (b.dogName || '').toLowerCase().trim();
       const existing = profiles.get(key);
       
       if (existing) {
