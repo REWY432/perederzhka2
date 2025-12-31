@@ -52,8 +52,8 @@ const BookingsList: React.FC<BookingsListProps> = ({
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(b =>
-        b.dogName.toLowerCase().includes(query) ||
-        b.breed.toLowerCase().includes(query) ||
+        b.dogName?.toLowerCase().includes(query) ||
+        (b.breed || '').toLowerCase().includes(query) ||
         b.ownerName?.toLowerCase().includes(query)
       );
     }
