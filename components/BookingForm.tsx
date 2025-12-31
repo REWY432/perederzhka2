@@ -77,7 +77,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
   const canGoNext = useMemo(() => {
     switch (step) {
       case 1:
-        return (formData.dogName || '').trim().length >= 2 && (formData.breed || '').trim().length >= 2;
+        return String(formData.dogName || '').trim().length >= 2 && String(formData.breed || '').trim().length >= 2;
       case 2:
         return formData.checkIn && formData.checkOut && days > 0;
       case 3:
