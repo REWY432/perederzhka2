@@ -182,6 +182,7 @@ const App: React.FC = () => {
                   >
                     <BookingsList
                       bookings={bookings}
+                      settings={settings || undefined}
                       onEdit={openEditBooking}
                       onDelete={handleDeleteBooking}
                       onStatusChange={handleStatusChange}
