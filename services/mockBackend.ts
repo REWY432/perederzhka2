@@ -35,11 +35,11 @@ export const fetchRemoteSettings = async (): Promise<AppSettings | null> => {
         
         if (response && response.data) {
              return {
-                hotelName: response.data.hotelName || 'DogStay Hotel',
+                hotelName: String(response.data.hotelName || 'DogStay Hotel'),
                 maxCapacity: Number(response.data.maxCapacity) || 10,
-                logoUrl: response.data.logoUrl || '',
-                tgToken: response.data.tgToken || '',
-                tgChatId: response.data.tgChatId || '',
+                logoUrl: String(response.data.logoUrl || ''),
+                tgToken: String(response.data.tgToken || ''),
+                tgChatId: String(response.data.tgChatId || ''),
                 theme: response.data.theme || 'light',
                 isLegacy: false
             };
@@ -68,14 +68,15 @@ export const saveRemoteSettings = async (settings: Partial<AppSettings>): Promis
 
 export const formatDate = (dateStr: string): string => {
   if (!dateStr) return '-';
-  if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-     const [y, m, d] = dateStr.split('-');
+  const str = String(dateStr);
+  if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
+     const [y, m, d] = str.split('-');
      return `${d}.${m}.${y}`;
   }
   try {
-    return new Date(dateStr).toLocaleDateString('ru-RU');
+    return new Date(str).toLocaleDateString('ru-RU');
   } catch (e) {
-    return dateStr;
+    return str;
   }
 };
 
@@ -91,9 +92,38 @@ export const calculateTotal = (booking: Booking): number => {
   const expensesTotal = booking.expenses 
     ? booking.expenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) 
     : 0;
-  const legacyTotal = (booking.diaperCost || 0) + (booking.damageCost || 0);
+  const legacyTotal = (Number(booking.diaperCost) || 0) + (Number(booking.damageCost) || 0);
 
-  return (days * booking.pricePerDay) + expensesTotal + legacyTotal;
+  return (days * Number(booking.pricePerDay)) + expensesTotal + legacyTotal;
+};
+
+// --- Normalize booking data from backend ---
+const normalizeBooking = (b: any): Booking => {
+  return {
+    id: String(b.id || ''),
+    dogName: String(b.dogName || ''),
+    breed: String(b.breed || ''),
+    size: b.size || DogSize.MEDIUM,
+    checkIn: String(b.checkIn || ''),
+    checkOut: String(b.checkOut || ''),
+    pricePerDay: Number(b.pricePerDay) || 0,
+    totalCost: Number(b.totalCost) || 0,
+    status: b.status || BookingStatus.REQUEST,
+    comment: String(b.comment || ''),
+    createdAt: Number(b.createdAt) || Date.now(),
+    expenses: Array.isArray(b.expenses) ? b.expenses.map((e: any) => ({
+      title: String(e.title || ''),
+      amount: Number(e.amount) || 0
+    })) : [],
+    diaperCost: Number(b.diaperCost) || 0,
+    damageCost: Number(b.damageCost) || 0,
+    tags: Array.isArray(b.tags) ? b.tags.map((t: any) => String(t)) : [],
+    checklist: Array.isArray(b.checklist) ? b.checklist.map((c: any) => String(c)) : [],
+    vaccineExpires: String(b.vaccineExpires || ''),
+    photoUrl: String(b.photoUrl || ''),
+    ownerName: b.ownerName ? String(b.ownerName) : undefined,
+    ownerPhone: b.ownerPhone ? String(b.ownerPhone) : undefined,
+  };
 };
 
 // --- Async API Methods (Bookings) ---
@@ -108,14 +138,7 @@ export const getBookings = async (): Promise<Booking[]> => {
         return [];
     }
 
-    return data.map((b: any) => ({
-        ...b,
-        pricePerDay: Number(b.pricePerDay),
-        diaperCost: Number(b.diaperCost),
-        damageCost: Number(b.damageCost),
-        createdAt: Number(b.createdAt),
-        expenses: Array.isArray(b.expenses) ? b.expenses : []
-    }));
+    return data.map(normalizeBooking);
   } catch (e) {
     console.error("Failed to fetch bookings", e);
     return [];
@@ -124,10 +147,6 @@ export const getBookings = async (): Promise<Booking[]> => {
 
 export const saveBooking = async (booking: Omit<Booking, 'id' | 'createdAt'>, id?: string): Promise<void> => {
   const payload: any = { ...booking };
-  
-  // New bookings ID generation is handled by backend if not provided, 
-  // but frontend usually provides 'id' for updates.
-  // We send the ID separately for updates to match backend 'updateBooking' logic or 'createBooking' logic
   
   if (id) {
     payload.id = id;
