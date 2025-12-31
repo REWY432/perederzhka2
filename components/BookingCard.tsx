@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Edit2, Trash2, Copy, MoreVertical, Check } from 'lucide-react';
+import { Calendar, Edit2, Trash2, Copy, MoreVertical, Check, Receipt } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Booking, BookingStatus } from '../types';
+import { Booking, BookingStatus, AppSettings } from '../types';
 import { calculateTotal } from '../services/mockBackend';
 import { Calendar as CalendarIcon } from 'lucide-react';
+import { printReceipt } from '../services/receiptGenerator';
 
 interface BookingCardProps {
   booking: Booking;
+  settings?: AppSettings;
   onEdit: (booking: Booking) => void;
   onDelete: (id: string) => void;
   onStatusChange?: (id: string, status: BookingStatus) => void;
@@ -33,6 +35,7 @@ const triggerHaptic = (type: 'light' | 'medium' | 'heavy' = 'light') => {
 
 const BookingCard: React.FC<BookingCardProps> = ({
   booking,
+  settings,
   onEdit,
   onDelete,
   onStatusChange,
@@ -43,6 +46,15 @@ const BookingCard: React.FC<BookingCardProps> = ({
   const [showActions, setShowActions] = useState(false);
   
   const total = calculateTotal(booking);
+
+  const handlePrintReceipt = () => {
+    triggerHaptic('light');
+    printReceipt({
+      booking,
+      settings: settings || { hotelName: 'DogStay Hotel', maxCapacity: 10 },
+      paymentMethod: 'Наличные'
+    });
+  };
 
   const getStatusColor = (status: BookingStatus) => {
     switch (status) {
@@ -171,6 +183,16 @@ const BookingCard: React.FC<BookingCardProps> = ({
             aria-label={t('common.delete')}
           >
             <Trash2 size={18} />
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={handlePrintReceipt}
+            className="p-2 text-slate-400 hover:text-blue-500 transition-colors rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20"
+            aria-label={t('receipt.print')}
+            title="Печать чека"
+          >
+            <Receipt size={18} />
           </motion.button>
         </div>
         
