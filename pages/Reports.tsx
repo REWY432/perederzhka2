@@ -106,7 +106,7 @@ const Reports: React.FC<ReportsProps> = ({ bookings, isLoading = false }) => {
     const stats: Record<string, number> = {};
     completedBookings.forEach(b => {
       b.expenses?.forEach(ex => {
-        const key = ex.title.trim();
+        const key = (ex.title || '').trim();
         stats[key] = (stats[key] || 0) + ex.amount;
       });
     });
@@ -122,7 +122,7 @@ const Reports: React.FC<ReportsProps> = ({ bookings, isLoading = false }) => {
 
     bookings.forEach(b => {
       if (b.status === BookingStatus.CANCELLED) return;
-      const name = b.dogName.trim().toLowerCase();
+      const name = (b.dogName || '').trim().toLowerCase();
       const year = new Date(b.checkIn).getFullYear();
       if (!firstVisits.has(name) || year < firstVisits.get(name)!) {
         firstVisits.set(name, year);
@@ -134,7 +134,7 @@ const Reports: React.FC<ReportsProps> = ({ bookings, isLoading = false }) => {
     let returningClients = 0;
 
     completedBookings.forEach(b => {
-      const name = b.dogName.trim().toLowerCase();
+      const name = (b.dogName || '').trim().toLowerCase();
       const revenue = calculateTotal(b);
 
       if (!activeClients[name]) {
