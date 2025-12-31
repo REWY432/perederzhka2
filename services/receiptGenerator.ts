@@ -321,7 +321,7 @@ export const downloadReceiptPDF = (data: ReceiptData): void => {
  * Share receipt via Web Share API (mobile)
  */
 export const shareReceipt = async (data: ReceiptData): Promise<boolean> => {
-  if (!navigator.share) {
+  if (!('share' in navigator)) {
     console.warn('Web Share API not supported');
     return false;
   }

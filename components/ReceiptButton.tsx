@@ -196,7 +196,7 @@ const ReceiptButton: React.FC<ReceiptButtonProps> = ({ booking, settings }) => {
                 </div>
 
                 {/* Share button (full width) */}
-                {navigator.share && (
+                {'share' in navigator && (
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
