@@ -1,0 +1,96 @@
+{
+  "history": {
+    "title": "История визитов",
+    "clientSince": "Клиент с",
+    "totalVisits": "Всего визитов",
+    "totalRevenue": "Общий доход",
+    "avgStay": "Средний срок",
+    "totalDays": "Всего дней",
+    "damageTotal": "Общий ущерб",
+    "visitHistory": "История посещений",
+    "noVisits": "Пока нет визитов"
+  },
+  "waitlist": {
+    "title": "Лист ожидания",
+    "inQueue": "В очереди",
+    "canConfirm": "Можно подтвердить",
+    "potentialRevenue": "Потенциальный доход",
+    "queue": "Очередь",
+    "spotsAvailable": "Есть {{count}} мест(а)",
+    "noSpots": "Нет мест",
+    "conflictDates": "Конфликт дат",
+    "confirm": "Подтвердить",
+    "addedOn": "Добавлено",
+    "empty": "Лист ожидания пуст",
+    "confirmationMessage": "Бронирование подтверждено: {{dogName}} с {{checkIn}} по {{checkOut}}",
+    "stillWaitingMessage": "Ваша заявка всё ещё в обработке. Мы свяжемся с вами, как только появится место."
+  },
+  "booking": {
+    "extendOneDay": "Продлить на 1 день",
+    "extendStay": "Продлить пребывание",
+    "currentCheckout": "Текущий выезд",
+    "newCheckout": "Новый выезд",
+    "totalDays": "Всего дней",
+    "noCapacityOn": "Нет мест на",
+    "additionalCost": "Доплата",
+    "confirmExtension": "Подтвердить продление"
+  },
+  "receipt": {
+    "title": "Создать чек",
+    "generate": "Создать чек",
+    "paymentMethod": "Способ оплаты",
+    "cash": "Наличные",
+    "card": "Карта",
+    "transfer": "Перевод",
+    "notes": "Примечание",
+    "notesPlaceholder": "Дополнительная информация...",
+    "print": "Печать",
+    "download": "Скачать",
+    "share": "Поделиться"
+  },
+  "analytics": {
+    "title": "Аналитика",
+    "subtitle": "Сезонность и прогнозы",
+    "yearRevenue": "Выручка за год",
+    "vsLastYear": "к прошлому году",
+    "confirmedFuture": "Подтверждённые брони",
+    "alreadyBooked": "Уже забронировано",
+    "potential": "Потенциал",
+    "basedOnHistory": "На основе истории",
+    "seasonality": "Сезонность",
+    "monthlyBreakdown": "Разбивка по месяцам",
+    "revenue": "Выручка",
+    "peakSeason": "Высокий сезон",
+    "lowSeason": "Низкий сезон",
+    "revenueForecast": "Прогноз дохода",
+    "next12Months": "Следующие 12 месяцев",
+    "actual": "Факт",
+    "confirmed": "Подтверждено",
+    "potentialForecast": "Прогноз",
+    "forecastSummary": "Итог прогноза",
+    "forecastDescription": "Подтверждённый доход: {{confirmed}} ₽. Потенциальный доход на основе исторических данных: {{potential}} ₽."
+  },
+  "status": {
+    "waitlist": "Ожидание",
+    "request": "Заявка",
+    "confirmed": "Подтверждено",
+    "completed": "Завершено",
+    "cancelled": "Отменено"
+  },
+  "size": {
+    "small": "Маленький",
+    "medium": "Средний",
+    "large": "Крупный"
+  },
+  "common": {
+    "day": "день",
+    "days": "дней",
+    "unknown": "Неизвестно",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "confirm": "Подтвердить",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "close": "Закрыть"
+  }
+}

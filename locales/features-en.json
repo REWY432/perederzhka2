@@ -1,0 +1,96 @@
+{
+  "history": {
+    "title": "Visit History",
+    "clientSince": "Client since",
+    "totalVisits": "Total visits",
+    "totalRevenue": "Total revenue",
+    "avgStay": "Avg. stay",
+    "totalDays": "Total days",
+    "damageTotal": "Total damage",
+    "visitHistory": "Visit history",
+    "noVisits": "No visits yet"
+  },
+  "waitlist": {
+    "title": "Waitlist",
+    "inQueue": "In queue",
+    "canConfirm": "Can confirm",
+    "potentialRevenue": "Potential revenue",
+    "queue": "Queue",
+    "spotsAvailable": "{{count}} spot(s) available",
+    "noSpots": "No spots",
+    "conflictDates": "Date conflict",
+    "confirm": "Confirm",
+    "addedOn": "Added on",
+    "empty": "Waitlist is empty",
+    "confirmationMessage": "Booking confirmed: {{dogName}} from {{checkIn}} to {{checkOut}}",
+    "stillWaitingMessage": "Your request is still being processed. We will contact you as soon as a spot becomes available."
+  },
+  "booking": {
+    "extendOneDay": "Extend by 1 day",
+    "extendStay": "Extend stay",
+    "currentCheckout": "Current checkout",
+    "newCheckout": "New checkout",
+    "totalDays": "Total days",
+    "noCapacityOn": "No capacity on",
+    "additionalCost": "Additional cost",
+    "confirmExtension": "Confirm extension"
+  },
+  "receipt": {
+    "title": "Generate Receipt",
+    "generate": "Generate receipt",
+    "paymentMethod": "Payment method",
+    "cash": "Cash",
+    "card": "Card",
+    "transfer": "Transfer",
+    "notes": "Notes",
+    "notesPlaceholder": "Additional information...",
+    "print": "Print",
+    "download": "Download",
+    "share": "Share"
+  },
+  "analytics": {
+    "title": "Analytics",
+    "subtitle": "Seasonality and forecasts",
+    "yearRevenue": "Year revenue",
+    "vsLastYear": "vs last year",
+    "confirmedFuture": "Confirmed bookings",
+    "alreadyBooked": "Already booked",
+    "potential": "Potential",
+    "basedOnHistory": "Based on history",
+    "seasonality": "Seasonality",
+    "monthlyBreakdown": "Monthly breakdown",
+    "revenue": "Revenue",
+    "peakSeason": "Peak season",
+    "lowSeason": "Low season",
+    "revenueForecast": "Revenue Forecast",
+    "next12Months": "Next 12 months",
+    "actual": "Actual",
+    "confirmed": "Confirmed",
+    "potentialForecast": "Forecast",
+    "forecastSummary": "Forecast Summary",
+    "forecastDescription": "Confirmed revenue: {{confirmed}}. Potential revenue based on historical data: {{potential}}."
+  },
+  "status": {
+    "waitlist": "Waitlist",
+    "request": "Request",
+    "confirmed": "Confirmed",
+    "completed": "Completed",
+    "cancelled": "Cancelled"
+  },
+  "size": {
+    "small": "Small",
+    "medium": "Medium",
+    "large": "Large"
+  },
+  "common": {
+    "day": "day",
+    "days": "days",
+    "unknown": "Unknown",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close"
+  }
+}
